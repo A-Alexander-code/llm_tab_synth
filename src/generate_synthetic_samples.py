@@ -21,6 +21,7 @@ GREAT_PARAMS: dict = {
     "epochs": 5,
     "fp16" : False, 
     "dataloader_num_workers": 2,
+    "gradient_checkpointing": True,
 }
 
 logging.basicConfig(
@@ -84,6 +85,7 @@ def train_and_sample(
         epochs=great_params["epochs"],
         fp16=great_params["fp16"],
         dataloader_num_workers=great_params["dataloader_num_workers"],
+        gradient_checkpointing=great_params["gradient_checkpointing"],
     )
     model.fit(df)
 
