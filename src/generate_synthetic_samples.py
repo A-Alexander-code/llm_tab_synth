@@ -17,7 +17,7 @@ N_SAMPLES = 200
 
 GREAT_PARAMS: dict = {
     "llm": 'tabularisai/Qwen3-0.3B-distil',
-    "batch_size": 4,
+    "batch_size": 2,
     "epochs": 5,
     "fp16" : False, 
     "dataloader_num_workers": 2,
