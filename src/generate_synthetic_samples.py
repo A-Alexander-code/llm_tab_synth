@@ -16,10 +16,11 @@ TARGET_COLUMN = "Outcome"
 N_SAMPLES = 200
 
 GREAT_PARAMS: dict = {
-    "llm": "distilgpt2",
+    "llm": 'tabularisai/Qwen3-0.3B-distil',
     "batch_size": 32,
-    "epochs": 50,
-    "efficient_finetuning": "",
+    "epochs": 5,
+    "fp16" : True, 
+    "dataloader_num_workers": 10,
 }
 
 logging.basicConfig(
@@ -81,8 +82,8 @@ def train_and_sample(
         llm=great_params["llm"],
         batch_size=great_params["batch_size"],
         epochs=great_params["epochs"],
-        efficient_finetuning=great_params["efficient_finetuning"],
-        fp16=False,
+        fp16=great_params["fp16"],
+        dataloader_num_workers=great_params["dataloader_num_workers"],
     )
     model.fit(df)
 
