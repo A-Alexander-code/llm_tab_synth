@@ -20,8 +20,8 @@ TARGET_COLUMN = "Outcome"
 N_SAMPLES = 200
 
 TABULA_PARAMS: dict = {
-    "llm": "distilgpt2",
-    "batch_size": 32,
+    "llm": "gpt2",
+    "batch_size": 8,
     "epochs": 50,
     "max_length": 200,
 }
