@@ -12,7 +12,7 @@ INPUT_FILE = DATA_DIR / "diabetes-retin.csv"
 
 OUTPUT_BASE = Path("synth_samples")
 
-TARGET_COLUMN = "Retinopathy"
+TARGET_COLUMN = "Outcome"
 N_SAMPLES = 200
 
 GREAT_PARAMS: dict = {
