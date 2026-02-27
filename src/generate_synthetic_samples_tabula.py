@@ -16,6 +16,8 @@ OUTPUT_BASE = Path("synth_samples")
 TABULA_REPO_URL = "https://github.com/zhao-zilong/Tabula.git"
 TABULA_DIR = Path("src/models/tabula")
 
+from tabula.tabula import Tabula
+
 TARGET_COLUMN = "Outcome"
 N_SAMPLES = 200
 
@@ -96,7 +98,7 @@ def train_and_sample(
     n_samples: int,
     tabula_params: dict,
 ) -> None:
-    from tabula.tabula import Tabula
+    
 
     df_clean = df.copy()
     df_clean.columns = [col.replace(" ", "_") for col in df_clean.columns]
