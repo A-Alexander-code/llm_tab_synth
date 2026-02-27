@@ -19,7 +19,7 @@ GREAT_PARAMS: dict = {
     "llm": 'tabularisai/Qwen3-0.3B-distil',
     "batch_size": 4,
     "epochs": 5,
-    "fp16" : True, 
+    "fp16" : False, 
     "dataloader_num_workers": 2,
 }
 
