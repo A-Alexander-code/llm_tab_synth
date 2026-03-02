@@ -61,7 +61,7 @@ def main() -> None:
     while True:
         counts = collected_samples[TARGET_COLUMN].value_counts()
         missing_per_class = {
-            cls: max(0, N_SAMPLES_PER_CLASS - int(counts.get(cls, 0))) 
+            cls: max(0, N_SAMPLES_PER_CLASS - int(counts.loc[cls] if cls in counts else 0))
             for cls in unique_classes
         }
         
