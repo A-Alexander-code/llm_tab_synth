@@ -16,9 +16,9 @@ TARGET_COLUMN = "Outcome"
 N_SAMPLES = 200
 
 GREAT_PARAMS: dict = {
-    "llm": "facebook/opt-125m",
+    "llm": "distilgpt2",
     "batch_size": 2,
-    "epochs": 10,
+    "epochs": 50,
     "fp16": False,
     "dataloader_num_workers": 2,
     "gradient_checkpointing": False,
