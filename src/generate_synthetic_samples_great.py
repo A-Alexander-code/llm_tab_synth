@@ -19,7 +19,9 @@ GREAT_PARAMS: dict = {
     "llm": 'facebook/opt-125m',
     "batch_size": 2,
     "epochs": 5,
-    "efficient_finetuning": "",
+    "fp16" : False, 
+    "dataloader_num_workers": 2,
+    "gradient_checkpointing": True,
 }
 
 logging.basicConfig(
