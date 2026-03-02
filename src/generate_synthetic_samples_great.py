@@ -17,8 +17,8 @@ N_SAMPLES = 200
 
 GREAT_PARAMS: dict = {
     "llm": "facebook/opt-125m",
-    "batch_size": 1,
-    "epochs": 5,
+    "batch_size": 2,
+    "epochs": 10,
     "fp16": False,
     "dataloader_num_workers": 2,
     "gradient_checkpointing": False,
@@ -91,7 +91,7 @@ def train_and_sample(
     model.fit(df)
 
     logger.info("Generating %d synthetic samples for class '%s'...", n_samples, label)
-    synthetic_df: pd.DataFrame = model.sample(n_samples)
+    synthetic_df: pd.DataFrame = model.sample(n_samples, guided_sampling=True, max_length=500,)
 
     out_path = out_dir / f"synthetic_class_{str(label).replace(' ', '_').lower()}.csv"
     synthetic_df.to_csv(out_path, index=False)
