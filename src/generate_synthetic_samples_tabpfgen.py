@@ -131,17 +131,27 @@ def main() -> None:
     for label in [majority_label, minority_label]:
         logger.info("Generating %d samples for class '%s'...", N_SAMPLES, label)
 
+        mask_train = y == label
+        X_class_train = X[mask_train]
+        y_class_train = y[mask_train]
+
+        X_other = X[~mask_train]
+        y_other = y[~mask_train]
+
+        X_combined = np.concatenate([X_class_train, X_other[:len(X_class_train)]], axis=0)
+        y_combined = np.concatenate([y_class_train, y_other[:len(y_class_train)]], axis=0)
+
         X_synth, y_synth, _, _ = generator.balance_dataset(
-            X, y, target_per_class={label: N_SAMPLES}
+            X_combined, y_combined, target_per_class=N_SAMPLES
         )
 
-        mask = y_synth == label
-        X_class = X_synth[mask]
-        y_class = y_synth[mask]
+        mask_synth = y_synth == label
+        X_class_synth = X_synth[mask_synth]
+        y_class_synth = y_synth[mask_synth]
 
         out_dir = build_output_dir(str(label), run_id)
-        synthetic_df = pd.DataFrame(X_class, columns=feature_cols)
-        synthetic_df[TARGET_COLUMN] = y_class
+        synthetic_df = pd.DataFrame(X_class_synth, columns=feature_cols)
+        synthetic_df[TARGET_COLUMN] = y_class_synth
 
         out_path = out_dir / f"synthetic_class_{label}.csv"
         synthetic_df.to_csv(out_path, index=False)
