@@ -18,8 +18,8 @@ N_SAMPLES = 200
 
 TABPFGEN_PARAMS: dict = {
     "n_sgld_steps": 500,
-    "step_size": 0.01,
-    "noise_scale": 0.01,
+    "sgld_step_size": 0.01,
+    "sgld_noise_scale": 0.01,
 }
 
 
@@ -86,8 +86,8 @@ def generate_for_class(
 
     generator = TabPFGen(
         n_sgld_steps=params["n_sgld_steps"],
-        step_size=params["step_size"],
-        noise_scale=params["noise_scale"],
+        sgld_step_size=params["sgld_step_size"],
+        sgld_noise_scale=params["sgld_noise_scale"],
     )
 
     target_per_class = {int(lbl): (n_samples if int(lbl) == int(label) else 0) for lbl in all_labels}
@@ -124,8 +124,8 @@ def main() -> None:
 
     generator = TabPFGen(
         n_sgld_steps=TABPFGEN_PARAMS["n_sgld_steps"],
-        step_size=TABPFGEN_PARAMS["step_size"],
-        noise_scale=TABPFGEN_PARAMS["noise_scale"],
+        sgld_step_size=TABPFGEN_PARAMS["sgld_step_size"],
+        sgld_noise_scale=TABPFGEN_PARAMS["sgld_noise_scale"],
     )
 
     for label in [majority_label, minority_label]:
