@@ -69,44 +69,6 @@ def build_output_dir(label: str, run_id: str) -> Path:
     return out_dir
 
 
-def generate_for_class(
-    df: pd.DataFrame,
-    label: int,
-    out_dir: Path,
-    n_samples: int,
-    params: dict,
-) -> None:
-    logger.info("Generating %d synthetic samples for class '%s'...", n_samples, label)
-
-    feature_cols = [c for c in df.columns if c != TARGET_COLUMN]
-    X = df[feature_cols].values.astype(np.float32)
-    y = df[TARGET_COLUMN].values.astype(int)
-
-    all_labels = np.unique(y)
-
-    generator = TabPFGen(
-        n_sgld_steps=params["n_sgld_steps"],
-        sgld_step_size=params["sgld_step_size"],
-        sgld_noise_scale=params["sgld_noise_scale"],
-    )
-
-    target_per_class = {int(lbl): (n_samples if int(lbl) == int(label) else 0) for lbl in all_labels}
-
-    X_synth, y_synth, _, _ = generator.balance_dataset(
-        X, y, target_per_class={int(label): n_samples}
-    )
-
-    mask = y_synth == int(label)
-    X_class = X_synth[mask]
-    y_class = y_synth[mask]
-
-    synthetic_df = pd.DataFrame(X_class, columns=feature_cols)
-    synthetic_df[TARGET_COLUMN] = y_class
-
-    out_path = out_dir / f"synthetic_class_{str(label).replace(' ', '_').lower()}.csv"
-    synthetic_df.to_csv(out_path, index=False)
-    logger.info("Saved %d samples to: %s", len(synthetic_df), out_path)
-
 
 def main() -> None:
     run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -132,26 +94,16 @@ def main() -> None:
         logger.info("Generating %d samples for class '%s'...", N_SAMPLES, label)
 
         mask_train = y == label
-        X_class_train = X[mask_train]
-        y_class_train = y[mask_train]
+        X_class = X[mask_train]
+        y_class = y[mask_train]
 
-        X_other = X[~mask_train]
-        y_other = y[~mask_train]
-
-        X_combined = np.concatenate([X_class_train, X_other[:len(X_class_train)]], axis=0)
-        y_combined = np.concatenate([y_class_train, y_other[:len(y_class_train)]], axis=0)
-
-        X_synth, y_synth, _, _ = generator.balance_dataset(
-            X_combined, y_combined, target_per_class=N_SAMPLES
+        X_synth, y_synth = generator.generate_classification(
+            X_class, y_class, n_samples=N_SAMPLES, balance_classes=False
         )
 
-        mask_synth = y_synth == label
-        X_class_synth = X_synth[mask_synth]
-        y_class_synth = y_synth[mask_synth]
-
         out_dir = build_output_dir(str(label), run_id)
-        synthetic_df = pd.DataFrame(X_class_synth, columns=feature_cols)
-        synthetic_df[TARGET_COLUMN] = y_class_synth
+        synthetic_df = pd.DataFrame(X_synth, columns=feature_cols)
+        synthetic_df[TARGET_COLUMN] = y_synth
 
         out_path = out_dir / f"synthetic_class_{label}.csv"
         synthetic_df.to_csv(out_path, index=False)
