@@ -16,13 +16,14 @@ TARGET_COLUMN = "Outcome"
 N_SAMPLES = 200
 
 GREAT_PARAMS: dict = {
-    "llm": 'facebook/opt-125m',
+    "llm": "facebook/opt-125m",
     "batch_size": 2,
     "epochs": 5,
-    "fp16" : False, 
+    "fp16": False,
     "dataloader_num_workers": 2,
     "gradient_checkpointing": True,
 }
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -77,7 +78,7 @@ def train_and_sample(
     n_samples: int,
     great_params: dict,
 ) -> None:
-    logger.info("Training GReaT for class '%s' (%d training rows)...", label, len(df))
+    logger.info("Training GReaT (opt-125m) for class '%s' (%d training rows)...", label, len(df))
 
     model = GReaT(
         llm=great_params["llm"],
