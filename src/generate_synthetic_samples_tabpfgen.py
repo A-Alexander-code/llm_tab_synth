@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from tabpfgen import TabPFGen
 
-
+# --- CONFIGURACIÓN ---
 DATA_DIR = Path("data")
 INPUT_FILE = DATA_DIR / "diabetes-retin.csv"
 OUTPUT_BASE = Path("synth_samples")
@@ -46,6 +46,7 @@ def main() -> None:
     run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
     logger.info("Run started | run_id: %s", run_id)
 
+    # 1. Preparación de datos
     df = load_data(INPUT_FILE)
     feature_cols = [c for c in df.columns if c != TARGET_COLUMN]
     X = df[feature_cols].values.astype(np.float32)
@@ -53,17 +54,24 @@ def main() -> None:
     
     unique_classes = np.unique(y)
     
+    # Acumulador para los datos sintéticos
     collected_samples = pd.DataFrame(columns=df.columns)
     
+    # 2. Inicializar Generador
     generator = TabPFGen(**TABPFGEN_PARAMS)
 
+    # 3. Bucle de generación iterativa
     iteration = 1
     while True:
+        # Ajuste para evitar FutureWarning y manejar tipos np.int64
         counts = collected_samples[TARGET_COLUMN].value_counts()
-        missing_per_class = {
-            cls: max(0, N_SAMPLES_PER_CLASS - int(counts.loc[cls] if cls in counts else 0))
-            for cls in unique_classes
-        }
+        
+        missing_per_class = {}
+        for cls in unique_classes:
+            # Convertimos a tipo nativo de Python para asegurar compatibilidad con .get()
+            native_cls = cls.item() if hasattr(cls, 'item') else cls
+            current_count = counts.get(native_cls, 0)
+            missing_per_class[native_cls] = max(0, N_SAMPLES_PER_CLASS - int(current_count))
         
         total_missing = sum(missing_per_class.values())
         
@@ -73,6 +81,7 @@ def main() -> None:
 
         logger.info("Iteration %d | Missing samples: %s", iteration, missing_per_class)
         
+        # Generamos un lote basado en lo que falta (mínimo 20 para estabilidad)
         batch_size = max(total_missing, 20) 
         X_batch, y_batch = generator.generate_classification(
             X, y, n_samples=batch_size, balance_classes=True
@@ -81,9 +90,12 @@ def main() -> None:
         batch_df = pd.DataFrame(X_batch, columns=feature_cols)
         batch_df[TARGET_COLUMN] = y_batch
         
+        # Concatenar y asegurar que los tipos de la columna objetivo se mantengan como int
         collected_samples = pd.concat([collected_samples, batch_df], ignore_index=True)
+        collected_samples[TARGET_COLUMN] = collected_samples[TARGET_COLUMN].astype(int)
         iteration += 1
 
+    # 4. Post-procesamiento y Guardado
     for label in unique_classes:
         class_df = collected_samples[collected_samples[TARGET_COLUMN] == label]
         class_df = class_df.head(N_SAMPLES_PER_CLASS)
