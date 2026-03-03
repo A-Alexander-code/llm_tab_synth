@@ -11,7 +11,7 @@ TAPTAP_DIR = Path("src/models/taptap")
 if str(TAPTAP_DIR) not in sys.path:
     sys.path.insert(0, str(TAPTAP_DIR))
 
-from taptap import Taptap
+from taptap.taptap import Taptap
 
 DATA_DIR = Path("data")
 INPUT_FILE = DATA_DIR / "diabetes-retin.csv"
