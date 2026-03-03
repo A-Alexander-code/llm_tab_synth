@@ -78,14 +78,14 @@ def train_and_sample(df, label, out_dir, n_samples, params):
         numerical_modeling=params["numerical_modeling"],
         gradient_accumulation_steps=params["gradient_accumulation_steps"],
     )
-    model.fit(df, target_col=TARGET_COLUMN, task="binclass")
+    model.fit(df, target_col=TARGET_COLUMN, task="classification")
 
     logger.info("Generating %d samples for class '%s'...", n_samples, label)
     synthetic_df = model.sample(
-        n_samples=n_samples,
-        data=df,
-        task="binclass",
-        max_length=1024,
+    n_samples=n_samples,
+    data=df,
+    task="classification",
+    max_length=1024,
     )
 
     synthetic_df[TARGET_COLUMN] = label
