@@ -20,7 +20,7 @@ TARGET_COLUMN = "Outcome"
 N_SAMPLES = 200
 
 TAPTAP_PARAMS: dict = {
-    "llm": "ztphs980/taptap-distilgpt2",
+    "llm": "distilgpt2",
     "experiment_dir": "./experiment_taptap/",
     "steps": 1000,
     "batch_size": 8,
