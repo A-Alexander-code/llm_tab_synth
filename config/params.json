@@ -1,102 +1,116 @@
 {
   "experiment": {
-
-    "datasets": ["diabetes-retin"],
-
-    "models": [
-        "great",
-        "tabula",
-        "realtabformer",
-        "ctgan",
-        "tvae",
-        "gaussian_copula",
-        "copulagan",
-        "tabpfgen",
-        "forestdiffusion",
-        "mostlyai"
+    "datasets": [
+      "diabetes-retin"
     ],
-
-    "seeds": [42, 123, 456],
-
-    "imbalance_ratios": [0.50, 0.75, 1.00],
-
+    "models": [
+      "great",
+      "tabula",
+      "realtabformer",
+      "ctgan",
+      "tvae",
+      "gaussian_copula",
+      "copulagan",
+      "tabpfgen",
+      "forestdiffusion",
+      "mostlyai"
+    ],
+    "seeds": [
+      42,
+      123,
+      456
+    ],
+    "imbalance_ratios": [
+      0.25,
+      0.5,
+      1
+    ],
     "n_samples_per_class": 200,
-
-    "target_column": "class",
-
+    "target_column": "Outcome",
     "test_split": 0.2
   },
-  
   "model_params": {
-
     "great": {
-        "llm": "distilgpt2",
-        "batch_size": 1,
-        "epochs": 50,
-        "fp16": false,
-        "dataloader_num_workers": 2,
-        "gradient_checkpointing": false
+      "llm": "distilgpt2",
+      "batch_size": 2,
+      "epochs": 5,
+      "fp16": false,
+      "dataloader_num_workers": 2,
+      "gradient_checkpointing": false,
+      "cuda_device": "0"
     },
-
     "tabula": {
-        "llm": "distilgpt2",
-        "batch_size": 32,
-        "epochs": 50,
-        "max_length": 200
+      "llm": "distilgpt2",
+      "batch_size": 32,
+      "epochs": 50,
+      "max_length": 200,
+      "cuda_device": "0"
     },
-
     "realtabformer": {
-        "model_type": "tabular",
-        "epochs": 100,
-        "batch_size": 8,
-        "gradient_accumulation_steps": 4,
-        "early_stopping_patience": 5
+      "model_type": "tabular",
+      "epochs": 100,
+      "batch_size": 8,
+      "gradient_accumulation_steps": 4,
+      "early_stopping_patience": 5,
+      "cuda_device": "0"
     },
-
     "ctgan": {
-        "epochs": 300,
-        "batch_size": 500,
-        "generator_dim": [256, 256],
-        "discriminator_dim": [256, 256]
+      "epochs": 300,
+      "batch_size": 500,
+      "generator_dim": [
+        256,
+        256
+      ],
+      "discriminator_dim": [
+        256,
+        256
+      ]
     },
-
     "tvae": {
-        "epochs": 300,
-        "batch_size": 500,
-        "compress_dims": [128, 128],
-        "decompress_dims": [128, 128],
-        "embedding_dim": 128
+      "epochs": 300,
+      "batch_size": 500,
+      "compress_dims": [
+        128,
+        128
+      ],
+      "decompress_dims": [
+        128,
+        128
+      ],
+      "embedding_dim": 128
     },
-
     "gaussian_copula": {
-        "default_distribution": "norm"
+      "default_distribution": "norm"
     },
-
     "copulagan": {
-        "epochs": 300,
-        "batch_size": 500,
-        "generator_dim": [256, 256],
-        "discriminator_dim": [256, 256],
-        "default_distribution": "norm"
+      "epochs": 300,
+      "batch_size": 500,
+      "generator_dim": [
+        256,
+        256
+      ],
+      "discriminator_dim": [
+        256,
+        256
+      ],
+      "default_distribution": "norm"
     },
-
     "tabpfgen": {
-        "n_sgld_steps": 500,
-        "sgld_step_size": 0.01,
-        "sgld_noise_scale": 0.01,
-        "device": "cpu"
+      "n_sgld_steps": 500,
+      "sgld_step_size": 0.01,
+      "sgld_noise_scale": 0.01,
+      "device": "cpu"
     },
-
     "forestdiffusion": {
-        "n_t": 50,
-        "duplicate_K": 100,
-        "n_jobs": -1
+      "n_t": 50,
+      "duplicate_K": 100,
+      "n_jobs": -1
     },
-
     "mostlyai": {
-        "max_training_time": 5,
-        "max_epochs": 100,
-        "verbose": 1
+      "max_training_time": 5,
+      "max_epochs": 100,
+      "verbose": 1,
+      "cuda_device": "0"
     }
   }
 }
