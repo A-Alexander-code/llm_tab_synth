@@ -35,7 +35,6 @@
       "llm": "distilgpt2",
       "batch_size": 32,
       "epochs": 50,
-      "max_length": 200,
       "cuda_device": "0"
     },
     "realtabformer": {
