@@ -24,11 +24,15 @@ class RealtabformerGenerator(BaseGenerator):
             gradient_accumulation_steps=self.params["gradient_accumulation_steps"],
             early_stopping_patience=self.params["early_stopping_patience"],
         )
-        model.fit(df, num_bootstrap=None)
+ 
+        fit_kwargs = {}
+        if "num_bootstrap" in self.params:
+            fit_kwargs["num_bootstrap"] = self.params["num_bootstrap"]
+ 
+        model.fit(df, **fit_kwargs)
         model.save(str(model_dir))
  
     def sample(self, n_samples: int, model_dir: Path) -> pd.DataFrame:
         os.environ["CUDA_VISIBLE_DEVICES"] = self.params.get("cuda_device", "0")
         model = REaLTabFormer.load(str(model_dir))
         return model.sample(n_samples)
- 
