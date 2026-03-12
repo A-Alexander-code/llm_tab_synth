@@ -1,9 +1,4 @@
-"""
-src/generators/great.py
-
-Generador basado en GReaT (be_great).
-LLM fine-tuned para datos tabulares usando distilgpt2 como backbone.
-"""
+"""GReaT-based synthetic data generator."""
 
 from __future__ import annotations
 
@@ -26,13 +21,12 @@ class GreatGenerator(BaseGenerator):
             fp16=self.params["fp16"],
             dataloader_num_workers=self.params["dataloader_num_workers"],
             gradient_checkpointing=self.params["gradient_checkpointing"],
-            save_finetuned_model=True,
-            trained_model_dir=str(model_dir),
         )
         model.fit(df)
+        model.save(str(model_dir.joinpath("great_model")))
 
     def sample(self, n_samples: int, model_dir: Path) -> pd.DataFrame:
-        model = GReaT.load_finetuned_model(str(model_dir))
+        model = GReaT.load(str(model_dir.joinpath("great_model")))
         return model.sample(
             n_samples,
             guided_sampling=True,
