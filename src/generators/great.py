@@ -14,7 +14,7 @@ from src.generators.base import BaseGenerator
 class GreatGenerator(BaseGenerator):
  
     def fit(self, df: pd.DataFrame, model_dir: Path) -> None:
-        os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+        os.environ["CUDA_VISIBLE_DEVICES"] = self.params.get("cuda_device", "0")
         model_dir.mkdir(parents=True, exist_ok=True)
  
         model = GReaT(
@@ -24,17 +24,15 @@ class GreatGenerator(BaseGenerator):
             fp16=self.params["fp16"],
             dataloader_num_workers=self.params["dataloader_num_workers"],
             gradient_checkpointing=self.params["gradient_checkpointing"],
-            save_finetuned_model=True,
-            trained_model_dir=str(model_dir),
         )
         model.fit(df)
+        model.save(str(model_dir))
  
     def sample(self, n_samples: int, model_dir: Path) -> pd.DataFrame:
-        os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+        os.environ["CUDA_VISIBLE_DEVICES"] = self.params.get("cuda_device", "0")
         model = GReaT.load_finetuned_model(str(model_dir))
         return model.sample(
             n_samples,
             guided_sampling=True,
             max_length=500,
         )
- 
