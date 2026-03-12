@@ -46,7 +46,7 @@ SUPPORTED_MODELS = [
     "mostlyai",
 ]
 
-DEFAULT_TARGET_COLUMN = "Outcome"
+DEFAULT_TARGET_COLUMN = "class"
 
 
 def get_processed_dir(dataset: str, seed: int) -> Path:
