@@ -1,61 +1,39 @@
 """Registry of available synthetic data generators and factory function."""
 
-from src.io_utils import (
-    load_dataset,
-    save_dataframe,
-    load_params,
-    save_json,
-    load_json,
-)
-from src.hashing import (
-    hash_dataframe,
-    hash_params,
-    compute_experiment_hash,
-)
-from src.logging_utils import (
-    setup_logging,
-)
-from src.data_splitter import (
-    split_and_save,
-    load_split,
-    is_split_ready,
-    reconstruct_dataframe,
-)
-from src.model_registry import (
-    is_model_trained,
-    register_trained_model,
-    get_model_metadata,
-)
-from src.timing import (
-    Timer,
-    save_timing,
-    load_timing,
-)
+from src.generators.base import BaseGenerator
+from src.generators.great import GreatGenerator
+from src.generators.tabula import TabulaGenerator
+from src.generators.realtabformer import RealtabformerGenerator
+from src.generators.ctgan import CtganGenerator
+from src.generators.tvae import TvaeGenerator
+from src.generators.gaussian_copula import GaussianCopulaGenerator
+from src.generators.copulagan import CopulaganGenerator
+from src.generators.tabpfgen import TabpfgenGenerator
+from src.generators.forestdiffusion import ForestDiffusionGenerator
+from src.generators.mostlyai import MostlyAIGenerator
 
-__all__ = [
-    # io
-    "load_dataset",
-    "save_dataframe",
-    "load_params",
-    "save_json",
-    "load_json",
-    # hashing
-    "hash_dataframe",
-    "hash_params",
-    "compute_experiment_hash",
-    # logging
-    "setup_logging",
-    # data splitting
-    "split_and_save",
-    "load_split",
-    "is_split_ready",
-    "reconstruct_dataframe",
-    # model registry
-    "is_model_trained",
-    "register_trained_model",
-    "get_model_metadata",
-    # timing
-    "Timer",
-    "save_timing",
-    "load_timing",
-]
+GENERATOR_REGISTRY: dict[str, type[BaseGenerator]] = {
+    "great": GreatGenerator,
+    "tabula": TabulaGenerator,
+    "realtabformer": RealtabformerGenerator,
+    "ctgan": CtganGenerator,
+    "tvae": TvaeGenerator,
+    "gaussian_copula": GaussianCopulaGenerator,
+    "copulagan": CopulaganGenerator,
+    "tabpfgen": TabpfgenGenerator,
+    "forestdiffusion": ForestDiffusionGenerator,
+    "mostlyai": MostlyAIGenerator,
+}
+
+
+def get_generator(model_name: str, params: dict) -> BaseGenerator:
+    """Instantiate and return the generator for the given model name."""
+    if model_name not in GENERATOR_REGISTRY:
+        raise ValueError(
+            f"Unknown model: {model_name}. "
+            f"Available: {list(GENERATOR_REGISTRY.keys())}"
+        )
+    return GENERATOR_REGISTRY[model_name](params)
+
+
+__all__ = ["GENERATOR_REGISTRY", "get_generator", "BaseGenerator"]
