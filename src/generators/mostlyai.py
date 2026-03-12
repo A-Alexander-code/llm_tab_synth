@@ -6,7 +6,6 @@ import os
 from pathlib import Path
  
 import pandas as pd
-from mostlyai import MostlyAI
  
 from src.generators.base import BaseGenerator
  
@@ -15,21 +14,38 @@ class MostlyAIGenerator(BaseGenerator):
  
     def fit(self, df: pd.DataFrame, model_dir: Path) -> None:
         os.environ["CUDA_VISIBLE_DEVICES"] = self.params.get("cuda_device", "0")
-        model_dir.mkdir(parents=True, exist_ok=True)
+        from mostlyai.engine._tabular.interface import encode, split, train  # noqa: PLC0415
  
-        mostly = MostlyAI(local=True)
-        config = {
-            "max_training_time": self.params["max_training_time"],
-            "max_epochs":        self.params["max_epochs"],
-            "verbose":           self.params["verbose"],
-        }
-        generator = mostly.train(data=df, config=config)
-        generator.save(str(model_dir.joinpath("mostlyai_model")))
+        model_dir.mkdir(parents=True, exist_ok=True)
+        workspace = str(model_dir)
+ 
+        # Paso 1: split (prepara particiones train/val dentro del workspace)
+        split(
+            tgt_data=df,
+            workspace_dir=workspace,
+        )
+ 
+        # Paso 2: encode (tokeniza y codifica los datos)
+        encode(workspace_dir=workspace)
+ 
+        # Paso 3: train
+        train(
+            max_training_time=self.params["max_training_time"],
+            max_epochs=self.params["max_epochs"],
+            device=self.params.get("cuda_device", "0"),
+            workspace_dir=workspace,
+        )
  
     def sample(self, n_samples: int, model_dir: Path) -> pd.DataFrame:
         os.environ["CUDA_VISIBLE_DEVICES"] = self.params.get("cuda_device", "0")
-        mostly = MostlyAI(local=True)
-        generator = mostly.load(str(model_dir.joinpath("mostlyai_model")))
-        synthetic = mostly.generate(generator=generator, size=n_samples)
-        return synthetic.data()
+        from mostlyai.engine._tabular.interface import generate, load_generated_data  # noqa: PLC0415
  
+        workspace = str(model_dir)
+ 
+        generate(
+            sample_size=n_samples,
+            device=self.params.get("cuda_device", "0"),
+            workspace_dir=workspace,
+        )
+ 
+        return load_generated_data(workspace_dir=workspace)
