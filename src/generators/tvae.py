@@ -1,23 +1,23 @@
 """TVAE-based synthetic data generator (SDV)."""
 
 from __future__ import annotations
-
+ 
 from pathlib import Path
-
+ 
 import pandas as pd
+from sdv.metadata import Metadata
 from sdv.single_table import TVAESynthesizer
-from sdv.metadata import SingleTableMetadata
-
+from sdv import utils as sdv_utils
+ 
 from src.generators.base import BaseGenerator
-
-
+ 
+ 
 class TvaeGenerator(BaseGenerator):
-
+ 
     def fit(self, df: pd.DataFrame, model_dir: Path) -> None:
         model_dir.mkdir(parents=True, exist_ok=True)
-        metadata = SingleTableMetadata()
-        metadata.detect_from_dataframe(df)
-
+        metadata = Metadata.detect_from_dataframe(df)
+ 
         model = TVAESynthesizer(
             metadata,
             epochs=self.params["epochs"],
@@ -28,7 +28,9 @@ class TvaeGenerator(BaseGenerator):
         )
         model.fit(df)
         model.save(str(model_dir.joinpath("tvae_model.pkl")))
-
+ 
     def sample(self, n_samples: int, model_dir: Path) -> pd.DataFrame:
-        model = TVAESynthesizer.load(str(model_dir.joinpath("tvae_model.pkl")))
+        model = sdv_utils.load_synthesizer(
+            str(model_dir.joinpath("tvae_model.pkl"))
+        )
         return model.sample(num_rows=n_samples)
