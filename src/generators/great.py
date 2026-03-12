@@ -28,13 +28,16 @@ class GreatGenerator(BaseGenerator):
         )
         model.fit(df)
  
+        # Limpiar directorio antes de guardar para evitar warning de be_great
         if model_dir.exists():
             shutil.rmtree(model_dir)
         model.save(str(model_dir))
  
     def sample(self, n_samples: int, model_dir: Path) -> pd.DataFrame:
         os.environ["CUDA_VISIBLE_DEVICES"] = self.params.get("cuda_device", "0")
-        model = GReaT.load_finetuned_model(path=str(model_dir))
+        # load_finetuned_model es método de instancia: instanciar con el mismo llm
+        model = GReaT(llm=self.params["llm"])
+        model.load_finetuned_model(path=str(model_dir))
         return model.sample(
             n_samples,
             guided_sampling=True,
