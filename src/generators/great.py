@@ -2,14 +2,26 @@
 
 from __future__ import annotations
  
+import io
 import os
 import shutil
 from pathlib import Path
  
 import pandas as pd
+import torch
 from be_great import GReaT
  
 from src.generators.base import BaseGenerator
+ 
+ 
+def _load_great_model(model: GReaT, model_dir: Path) -> None:
+    model_pt = model_dir.joinpath("model.pt")
+    if not model_pt.exists():
+        model_pt = model_dir
+ 
+    buffer = io.BytesIO(model_pt.read_bytes())
+    state_dict = torch.load(buffer, map_location="cpu")
+    model.model.load_state_dict(state_dict)
  
  
 class GreatGenerator(BaseGenerator):
@@ -27,17 +39,17 @@ class GreatGenerator(BaseGenerator):
             gradient_checkpointing=self.params["gradient_checkpointing"],
         )
         model.fit(df)
- 
-        # Limpiar directorio antes de guardar para evitar warning de be_great
+
         if model_dir.exists():
             shutil.rmtree(model_dir)
         model.save(str(model_dir))
  
     def sample(self, n_samples: int, model_dir: Path) -> pd.DataFrame:
         os.environ["CUDA_VISIBLE_DEVICES"] = self.params.get("cuda_device", "0")
-        # load_finetuned_model es método de instancia: instanciar con el mismo llm
+ 
         model = GReaT(llm=self.params["llm"])
-        model.load_finetuned_model(path=str(model_dir))
+        _load_great_model(model, model_dir)
+ 
         return model.sample(
             n_samples,
             guided_sampling=True,
