@@ -3,6 +3,7 @@
 from __future__ import annotations
  
 import os
+import shutil
 from pathlib import Path
  
 import pandas as pd
@@ -26,13 +27,17 @@ class GreatGenerator(BaseGenerator):
             gradient_checkpointing=self.params["gradient_checkpointing"],
         )
         model.fit(df)
+ 
+        if model_dir.exists():
+            shutil.rmtree(model_dir)
         model.save(str(model_dir))
  
     def sample(self, n_samples: int, model_dir: Path) -> pd.DataFrame:
         os.environ["CUDA_VISIBLE_DEVICES"] = self.params.get("cuda_device", "0")
-        model = GReaT.load_finetuned_model(str(model_dir))
+        model = GReaT.load_finetuned_model(path=str(model_dir))
         return model.sample(
             n_samples,
             guided_sampling=True,
             max_length=500,
         )
+ 
