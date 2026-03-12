@@ -26,6 +26,7 @@ class CtganGenerator(BaseGenerator):
             discriminator_dim=tuple(self.params["discriminator_dim"]),
         )
         model.fit(df)
+        metadata.save_to_json(str(model_dir.joinpath("metadata.json")))
         model.save(str(model_dir.joinpath("ctgan_model.pkl")))
  
     def sample(self, n_samples: int, model_dir: Path) -> pd.DataFrame:
@@ -33,3 +34,4 @@ class CtganGenerator(BaseGenerator):
             str(model_dir.joinpath("ctgan_model.pkl"))
         )
         return model.sample(num_rows=n_samples)
+ 
