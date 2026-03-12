@@ -37,7 +37,7 @@ class TabulaGenerator(BaseGenerator):
             llm=self.params["llm"],
             batch_size=self.params["batch_size"],
             epochs=self.params["epochs"],
-            max_length=self.params["max_length"],
+            #max_length=self.params["max_length"],
         )
         model.fit(df)
         model.save(str(model_dir.joinpath("tabula_model")))
