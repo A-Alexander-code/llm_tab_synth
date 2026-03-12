@@ -31,7 +31,7 @@
 
     "great": {
         "llm": "distilgpt2",
-        "batch_size": 2,
+        "batch_size": 1,
         "epochs": 50,
         "fp16": false,
         "dataloader_num_workers": 2,
