@@ -9,7 +9,7 @@ Usage:
 """
 
 from __future__ import annotations
-
+ 
 import argparse
 import json
 import logging
@@ -17,13 +17,13 @@ import shutil
 import sys
 from datetime import datetime
 from pathlib import Path
-
+ 
 import numpy as np
 import pandas as pd
-
+ 
 ROOT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT_DIR))
-
+ 
 from config.const import (
     DATA_RAW_DIR,
     LOGGING_CONFIG,
@@ -43,8 +43,8 @@ from src.io_utils import load_params, save_dataframe, save_json
 from src.logging_utils import setup_logging
 from src.model_registry import is_model_trained, register_trained_model
 from src.timing import Timer, save_timing
-
-
+ 
+ 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Generate synthetic samples using multiple generative models.",
@@ -82,66 +82,64 @@ def parse_args() -> argparse.Namespace:
         help="Print the planned experiment combinations without executing.",
     )
     return parser.parse_args()
-
-
+ 
+ 
 def resolve_combinations(
     params: dict,
     args: argparse.Namespace,
 ) -> tuple[list[str], list[str], list[int]]:
-    """Resolve final sets of models, datasets, and seeds."""
-    models = args.models or params["experiment"]["models"]
+    """Resuelve los conjuntos finales de modelos, datasets y seeds."""
+    models = args.models   or params["experiment"]["models"]
     datasets = args.datasets or params["experiment"]["datasets"]
-    seeds = args.seeds or params["experiment"]["seeds"]
-
+    seeds = args.seeds    or params["experiment"]["seeds"]
+ 
+    # Validar modelos
     invalid = [m for m in models if m not in SUPPORTED_MODELS]
     if invalid:
         raise ValueError(f"Unsupported models: {invalid}. Valid: {SUPPORTED_MODELS}")
-
+ 
     return models, datasets, seeds
-
-
+ 
+ 
 def build_train_df_for_class(
     X_train: np.ndarray,
     y_train: np.ndarray,
     label: int,
     meta: dict,
 ) -> pd.DataFrame:
-    """Reconstruct train DataFrame filtered by class."""
     mask = y_train == label
     X_class = X_train[mask]
     y_class = y_train[mask]
     df = reconstruct_dataframe(X_class, y_class, meta)
     return df.drop(columns=[meta["dataset"]["target_column"]])
-
-
+ 
+ 
 def build_full_train_df(
     X_train: np.ndarray,
     y_train: np.ndarray,
     meta: dict,
 ) -> pd.DataFrame:
-    """Reconstruct full train DataFrame with target renamed to '__target__'."""
     df = reconstruct_dataframe(X_train, y_train, meta)
     target_col = meta["dataset"]["target_column"]
     return df.rename(columns={target_col: "__target__"})
-
-
-# Models trained on full dataset rather than per-class
+ 
+ 
 _FULL_DATASET_MODELS = {"tabpfgen", "forestdiffusion"}
-
-
+ 
+ 
 def run(args: argparse.Namespace) -> None:
     params   = load_params(args.config)
     models, datasets, seeds = resolve_combinations(params, args)
-
-    n_samples = params["experiment"]["n_samples_per_class"]
-    test_size = params["experiment"]["test_split"]
-    target_col = params["experiment"]["target_column"]
-    labels = [0, 1]
-
+ 
+    n_samples   = params["experiment"]["n_samples_per_class"]
+    test_size   = params["experiment"]["test_split"]
+    target_col  = params["experiment"]["target_column"]
+    labels      = [0, 1]
+ 
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_file = LOGS_DIR.joinpath(f"sampler_{ts}.log")
-    logger = setup_logging(LOGGING_CONFIG, log_file, logger_name="sampler")
-
+    logger   = setup_logging(LOGGING_CONFIG, log_file, logger_name="sampler")
+ 
     logger.info("=" * 60)
     logger.info("main_sampler started at %s", ts)
     logger.info("Config: %s", args.config)
@@ -152,10 +150,10 @@ def run(args: argparse.Namespace) -> None:
     logger.info("force_retrain: %s", args.force_retrain)
     logger.info("dry_run: %s", args.dry_run)
     logger.info("=" * 60)
-
+ 
     total_combinations = len(models) * len(datasets) * len(seeds)
     logger.info("Total combinations: %d", total_combinations)
-
+ 
     if args.dry_run:
         print("\n[DRY RUN] Planned combinations:")
         for dataset in datasets:
@@ -164,20 +162,20 @@ def run(args: argparse.Namespace) -> None:
                     print(f"  model={model:20s}  dataset={dataset}  seed={seed}")
         print(f"\nTotal: {total_combinations} combinations")
         return
-
+ 
     for dataset in datasets:
         raw_path = DATA_RAW_DIR.joinpath(f"{dataset}.csv")
         if not raw_path.exists():
             logger.error("Dataset not found: %s", raw_path)
             continue
-
+ 
         from src.io_utils import load_dataset
         df_raw = load_dataset(raw_path)
         logger.info("Loaded dataset '%s': %d rows, %d cols", dataset, *df_raw.shape)
-
+ 
         for seed in seeds:
             processed_dir = get_processed_dir(dataset, seed)
-
+ 
             if is_split_ready(processed_dir):
                 logger.info(
                     "[%s | seed=%d] Split already exists. Loading from %s",
@@ -202,47 +200,46 @@ def run(args: argparse.Namespace) -> None:
                     meta["split"]["n_test"],
                     meta["class_distribution"]["train"]["imbalance_ratio"],
                 )
-
+ 
             X_train, X_test, y_train, y_test, meta = load_split(processed_dir)
-
+ 
             for model_name in models:
                 model_params  = params["model_params"][model_name]
                 uses_full_df  = model_name in _FULL_DATASET_MODELS
-
+ 
                 logger.info(
                     "[%s | seed=%d | %s] Starting...",
                     dataset, seed, model_name,
                 )
-
+ 
                 exp_hash = compute_experiment_hash(
                     pd.DataFrame(X_train), model_params
                 )
-
+ 
                 samples_dir = get_samples_dir(model_name, dataset, seed)
                 samples_dir.mkdir(parents=True, exist_ok=True)
                 timing_path = samples_dir.joinpath(TIMING_FILENAME)
-
+ 
                 if uses_full_df:
-                    # Single model for full dataset (TabPFGen, ForestDiffusion)
                     class_dir = get_model_class_dir(model_name, dataset, seed, label=0)
-                    class_dir = class_dir.parent  # Use parent seed_dir as model_dir
-
+                    class_dir = class_dir.parent  # usa seed_dir como model_dir
+ 
                     already_trained = (
                         not args.force_retrain
                         and is_model_trained(class_dir, exp_hash)
                     )
-
+ 
                     if not already_trained:
                         train_df = build_full_train_df(X_train, y_train, meta)
                         generator = get_generator(model_name, model_params)
-
+ 
                         logger.info(
                             "[%s | seed=%d | %s] Training on full dataset (%d rows)...",
                             dataset, seed, model_name, len(train_df),
                         )
                         with Timer("training") as t_train:
                             generator.fit(train_df, class_dir)
-
+ 
                         save_timing(
                             {f"training_s": round(t_train.elapsed, 4)},
                             timing_path,
@@ -264,7 +261,7 @@ def run(args: argparse.Namespace) -> None:
                             "[%s | seed=%d | %s] Model already trained. Skipping.",
                             dataset, seed, model_name,
                         )
-
+ 
                     for label in labels:
                         _generate_and_save(
                             generator=generator,
@@ -278,18 +275,18 @@ def run(args: argparse.Namespace) -> None:
                             seed=seed,
                             logger=logger,
                         )
-
+ 
                 else:
                     for label in labels:
                         class_dir = get_model_class_dir(model_name, dataset, seed, label)
-
+ 
                         already_trained = (
                             not args.force_retrain
                             and is_model_trained(class_dir, exp_hash)
                         )
-
+ 
                         generator = get_generator(model_name, model_params)
-
+ 
                         if not already_trained:
                             train_df = build_train_df_for_class(
                                 X_train, y_train, label, meta
@@ -300,7 +297,7 @@ def run(args: argparse.Namespace) -> None:
                             )
                             with Timer("training") as t_train:
                                 generator.fit(train_df, class_dir)
-
+ 
                             save_timing(
                                 {f"training_class_{label}_s": round(t_train.elapsed, 4)},
                                 timing_path,
@@ -321,7 +318,7 @@ def run(args: argparse.Namespace) -> None:
                                 "[%s | seed=%d | %s | class=%d] Already trained. Skipping.",
                                 dataset, seed, model_name, label,
                             )
-
+ 
                         _generate_and_save(
                             generator=generator,
                             model_dir=class_dir,
@@ -334,7 +331,7 @@ def run(args: argparse.Namespace) -> None:
                             seed=seed,
                             logger=logger,
                         )
-
+ 
                 snapshot_path = samples_dir.joinpath(PARAMS_SNAPSHOT_NAME)
                 save_json(
                     {
@@ -351,10 +348,10 @@ def run(args: argparse.Namespace) -> None:
                     "[%s | seed=%d | %s] Params snapshot saved to %s",
                     dataset, seed, model_name, snapshot_path,
                 )
-
+ 
     logger.info("main_sampler finished.")
-
-
+ 
+ 
 def _generate_and_save(
     generator,
     model_dir: Path,
@@ -367,18 +364,22 @@ def _generate_and_save(
     seed: int,
     logger: logging.Logger,
 ) -> None:
-    """Generate and save synthetic samples for a class."""
     logger.info(
         "[%s | seed=%d | %s | class=%d] Generating %d samples...",
         dataset, seed, model_name, label, n_samples,
     )
     with Timer("sampling") as t_sample:
         synth_df = generator.sample(n_samples, model_dir)
-
+ 
+    if "__label__" in synth_df.columns:
+        synth_df = synth_df[synth_df["__label__"] == label].drop(
+            columns=["__label__"]
+        ).reset_index(drop=True)
+ 
     synth_df["class"] = label
     out_path = samples_dir.joinpath(f"synthetic_class_{label}.csv")
     save_dataframe(synth_df, out_path)
-
+ 
     save_timing(
         {f"sampling_class_{label}_s": round(t_sample.elapsed, 4)},
         timing_path,
@@ -388,7 +389,8 @@ def _generate_and_save(
         dataset, seed, model_name, label,
         len(synth_df), out_path, t_sample.elapsed,
     )
-
+ 
+ 
 
 if __name__ == "__main__":
     args = parse_args()
