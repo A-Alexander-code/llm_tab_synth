@@ -32,7 +32,7 @@
     "great": {
         "llm": "distilgpt2",
         "batch_size": 2,
-        "epochs": 5,
+        "epochs": 50,
         "fp16": false,
         "dataloader_num_workers": 2,
         "gradient_checkpointing": false
