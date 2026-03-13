@@ -1,7 +1,8 @@
 {
   "experiment": {
     "datasets": [
-      "diabetes-retin"
+      "diabetes-retin",
+      "T1D_child"
     ],
     "models": [
       "great",

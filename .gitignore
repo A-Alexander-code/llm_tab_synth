@@ -4,3 +4,8 @@
 /evaluation_results
 /.vscode
 src/deeprecated
+testing_stuff.ipynb
+
+# Agents and skills configurations
+AGENTS.md
+/.agents
