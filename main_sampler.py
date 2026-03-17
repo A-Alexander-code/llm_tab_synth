@@ -44,8 +44,16 @@ from src.logging_utils import setup_logging
 from src.model_registry import is_model_trained, register_trained_model
 from src.timing import Timer, save_timing
 from src.io_utils import load_dataset
- 
- 
+
+import warnings
+warnings.filterwarnings(
+    "ignore",
+    message=".*GPT2TokenizerFast.*",
+    category=UserWarning,
+)
+warnings.filterwarnings("ignore", category=UserWarning, module="transformers")
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Generate synthetic samples using multiple generative models.",
