@@ -2,6 +2,7 @@
 /src/models
 /synth_samples
 /evaluation_results
+/results/samples
 /.vscode
 src/deeprecated
 testing_stuff.ipynb

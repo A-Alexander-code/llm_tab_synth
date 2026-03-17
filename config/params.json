@@ -2,7 +2,8 @@
   "experiment": {
     "datasets": [
       "diabetes-retin",
-      "T1D_child"
+      "T1D_child",
+      "heart_cleveland"
     ],
     "models": [
       "great",
@@ -18,18 +19,18 @@
     ],
     "seeds": [42],
     "imbalance_ratios": [0.5, 0.75, 1],
-    "n_samples_per_class": 50,
+    "n_samples_per_class": 300,
     "target_column": "class",
     "test_split": 0.2
   },
   "model_params": {
     "great": {
       "llm": "distilgpt2",
-      "batch_size": 2,
-      "epochs": 5,
+      "batch_size": 8,
+      "epochs": 75,
       "fp16": false,
-      "dataloader_num_workers": 2,
-      "gradient_checkpointing": false,
+      "dataloader_num_workers": 4,
+      "gradient_checkpointing": true,
       "cuda_device": "0"
     },
     "tabula": {

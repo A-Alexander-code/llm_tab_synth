@@ -31,16 +31,16 @@ from xgboost import XGBClassifier
 
 warnings.filterwarnings("ignore")
 
-# ─── Configuración ───────────────────────────────────────────────────────────
 
-DATA_DIR        = Path("data")
-INPUT_FILE      = DATA_DIR / "diabetes-retin.csv"
-SYNTH_BASE      = Path("synth_samples")
-OUTPUT_DIR      = Path("evaluation_results")
-TARGET_COLUMN   = "Outcome"
-RANDOM_STATE    = 42
-N_BINS          = 20          # bins para JS divergence
-NNAA_N_NEIGHBORS = 1          # vecinos para NNAA
+
+DATA_DIR= Path("data")
+INPUT_FILE = DATA_DIR / "diabetes-retin.csv"
+SYNTH_BASE = Path("synth_samples")
+OUTPUT_DIR = Path("evaluation_results")
+TARGET_COLUMN = "Outcome"
+RANDOM_STATE = 42
+N_BINS = 20         
+NNAA_N_NEIGHBORS = 1        
 
 logging.basicConfig(
     level=logging.INFO,
@@ -50,7 +50,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-# ─── Utilidades ──────────────────────────────────────────────────────────────
 
 def load_real_data(path: Path) -> pd.DataFrame:
     df = pd.read_csv(path)
@@ -77,16 +76,16 @@ def scale(real: np.ndarray, synth: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     return scaler.transform(real), scaler.transform(synth)
 
 
-# ─── Bloque 1: Privacidad ────────────────────────────────────────────────────
+
 
 def dcr(real: np.ndarray, synth: np.ndarray) -> dict:
     """Distance to Closest Record."""
     r, s = scale(real, synth)
     dists = cdist(s, r, metric="euclidean").min(axis=1)
     return {
-        "dcr_mean":   float(np.mean(dists)),
+        "dcr_mean": float(np.mean(dists)),
         "dcr_median": float(np.median(dists)),
-        "dcr_p5":     float(np.percentile(dists, 5)),   # percentil 5: casos más cercanos
+        "dcr_p5": float(np.percentile(dists, 5)),  
     }
 
 
@@ -102,13 +101,12 @@ def nnaa(real: np.ndarray, synth: np.ndarray) -> dict:
     r, s = r[:n], s[:n]
 
     combined = np.vstack([r, s])
-    labels   = np.array([0] * n + [1] * n)   # 0=real, 1=synth
+    labels   = np.array([0] * n + [1] * n)   
 
     dists = cdist(combined, combined, metric="euclidean")
     np.fill_diagonal(dists, np.inf)
 
     nn_labels = labels[dists.argmin(axis=1)]
-    # Accuracy: fracción donde el vecino más cercano tiene la misma etiqueta
     nnaa_score = float(np.mean(nn_labels == labels))
     return {"nnaa": nnaa_score}
 
@@ -135,7 +133,7 @@ def membership_inference_attack(real: np.ndarray, synth: np.ndarray) -> dict:
     return {"mia_auc": float(auc)}
 
 
-# ─── Bloque 2: Fidelidad estadística ─────────────────────────────────────────
+
 
 def ks_tests(real: pd.DataFrame, synth: pd.DataFrame, feature_cols: list[str]) -> dict:
     """KS-test por columna. p>0.05 → distribuciones no distinguibles."""
@@ -180,7 +178,6 @@ def correlation_distance(real: pd.DataFrame, synth: pd.DataFrame, feature_cols: 
     return {"corr_distance": dist}
 
 
-# ─── Bloque 3: Utilidad (TSTR vs TRTR) ───────────────────────────────────────
 
 def tstr_vs_trtr(
     real_df: pd.DataFrame,
@@ -192,7 +189,6 @@ def tstr_vs_trtr(
     Train on Real Test on Real (TRTR).
     Usa el dataset real completo (ambas clases) para test.
     """
-    # Dataset real completo para test
     X_real = real_df[feature_cols].values
     y_real = real_df[TARGET_COLUMN].values
 
@@ -216,10 +212,8 @@ def tstr_vs_trtr(
             "f1":   float(f1_score(y_test, preds, zero_division=0)),
         }
 
-    # TRTR
     trtr = train_eval(X_tr_real, y_tr_real, X_te, y_te)
 
-    # TSTR: combina sintéticos de ambas clases con el target correcto
     X_synth = synth_df[feature_cols].values
     y_synth = synth_df[TARGET_COLUMN].values
 
@@ -233,16 +227,15 @@ def tstr_vs_trtr(
     tstr = train_eval(X_synth, y_synth, X_te, y_te)
 
     return {
-        "trtr_auc":       trtr["auc"],
-        "trtr_f1":        trtr["f1"],
-        "tstr_auc":       tstr["auc"],
-        "tstr_f1":        tstr["f1"],
+        "trtr_auc": trtr["auc"],
+        "trtr_f1": trtr["f1"],
+        "tstr_auc": tstr["auc"],
+        "tstr_f1": tstr["f1"],
         "tstr_auc_ratio": float(tstr["auc"] / trtr["auc"]) if trtr["auc"] > 0 else None,
-        "tstr_f1_ratio":  float(tstr["f1"] / trtr["f1"])   if trtr["f1"]  > 0 else None,
+        "tstr_f1_ratio": float(tstr["f1"] / trtr["f1"])   if trtr["f1"]  > 0 else None,
     }
 
 
-# ─── Evaluación principal ────────────────────────────────────────────────────
 
 def evaluate_model_class(
     model: str,
@@ -255,7 +248,6 @@ def evaluate_model_class(
     if synth_df is None:
         return None
 
-    # Alinear columnas
     missing = [c for c in feature_cols if c not in synth_df.columns]
     if missing:
         logger.warning("Model %s class %d missing cols: %s", model, label, missing)

@@ -43,6 +43,7 @@ from src.io_utils import load_params, save_dataframe, save_json
 from src.logging_utils import setup_logging
 from src.model_registry import is_model_trained, register_trained_model
 from src.timing import Timer, save_timing
+from src.io_utils import load_dataset
  
  
 def parse_args() -> argparse.Namespace:
@@ -169,7 +170,6 @@ def run(args: argparse.Namespace) -> None:
             logger.error("Dataset not found: %s", raw_path)
             continue
  
-        from src.io_utils import load_dataset
         df_raw = load_dataset(raw_path)
         logger.info("Loaded dataset '%s': %d rows, %d cols", dataset, *df_raw.shape)
  
