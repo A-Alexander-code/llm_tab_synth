@@ -12,8 +12,9 @@ from pathlib import Path
  
 import pandas as pd
 import torch
- 
+
 from src.generators.base import BaseGenerator
+from src.training_workspace import training_workspace
  
 _TABULA_REPO = "https://github.com/zhao-zilong/Tabula"
 _TABULA_DIR  = Path(__file__).resolve().parent.parent.joinpath("models").joinpath("tabula")
@@ -92,17 +93,18 @@ class TabulaGenerator(BaseGenerator):
         os.environ["CUDA_VISIBLE_DEVICES"] = self.params.get("cuda_device", "0")
         _ensure_tabula()
         from tabula.tabula import Tabula  # noqa: PLC0415
- 
+
         if model_dir.exists():
             shutil.rmtree(model_dir)
         model_dir.mkdir(parents=True, exist_ok=True)
  
-        model = Tabula(
-            llm=self.params["llm"],
-            batch_size=self.params["batch_size"],
-            epochs=self.params["epochs"],
-        )
-        model.fit(df)
+        with training_workspace(model_dir):
+            model = Tabula(
+                llm=self.params["llm"],
+                batch_size=self.params["batch_size"],
+                epochs=self.params["epochs"],
+            )
+            model.fit(df)
         _save_tabula(model, model_dir)
  
     def sample(self, n_samples: int, model_dir: Path) -> pd.DataFrame:

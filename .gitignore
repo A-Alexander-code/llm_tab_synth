@@ -1,5 +1,6 @@
 /data
 /src/models
+/train_model_info
 /synth_samples
 /evaluation_results
 /results/samples

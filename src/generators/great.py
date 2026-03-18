@@ -11,8 +11,9 @@ from pathlib import Path
 import pandas as pd
 import torch
 from be_great import GReaT
- 
+
 from src.generators.base import BaseGenerator
+from src.training_workspace import training_workspace
  
  
 def _restore_great_from_dir(model_dir: Path) -> GReaT:
@@ -51,17 +52,18 @@ class GreatGenerator(BaseGenerator):
     def fit(self, df: pd.DataFrame, model_dir: Path) -> None:
         os.environ["CUDA_VISIBLE_DEVICES"] = self.params.get("cuda_device", "0")
         model_dir.mkdir(parents=True, exist_ok=True)
- 
-        model = GReaT(
-            llm=self.params["llm"],
-            batch_size=self.params["batch_size"],
-            epochs=self.params["epochs"],
-            fp16=self.params["fp16"],
-            dataloader_num_workers=self.params["dataloader_num_workers"],
-            gradient_checkpointing=self.params["gradient_checkpointing"],
-        )
-        model.fit(df)
- 
+
+        with training_workspace(model_dir):
+            model = GReaT(
+                llm=self.params["llm"],
+                batch_size=self.params["batch_size"],
+                epochs=self.params["epochs"],
+                fp16=self.params["fp16"],
+                dataloader_num_workers=self.params["dataloader_num_workers"],
+                gradient_checkpointing=self.params["gradient_checkpointing"],
+            )
+            model.fit(df)
+
         if model_dir.exists():
             shutil.rmtree(model_dir)
         model.save(str(model_dir))

@@ -8,6 +8,7 @@ CONFIG_DIR = ROOT_DIR.joinpath("config")
 DATA_DIR = ROOT_DIR.joinpath("data")
 RESULTS_DIR = ROOT_DIR.joinpath("results")
 MODELS_DIR = ROOT_DIR.joinpath("models")
+TRAIN_MODEL_INFO_DIR = ROOT_DIR.joinpath("train_model_info")
 LOGS_DIR = ROOT_DIR.joinpath("logs")
 SCRIPTS_DIR = ROOT_DIR.joinpath("scripts")
 SRC_DIR = ROOT_DIR.joinpath("src")
@@ -62,6 +63,23 @@ def get_model_dir(model: str, dataset: str, seed: int) -> Path:
 def get_model_class_dir(model: str, dataset: str, seed: int, label: int) -> Path:
     """Path to class-specific model: models/{model}/{dataset}/seed_{seed}/class_{label}/"""
     return get_model_dir(model, dataset, seed).joinpath(f"class_{label}")
+
+
+def get_train_model_info_dir(model: str, dataset: str, seed: int) -> Path:
+    """Path to training auxiliaries: train_model_info/{model}/{dataset}/seed_{seed}/"""
+    return TRAIN_MODEL_INFO_DIR.joinpath(model).joinpath(dataset).joinpath(
+        f"seed_{seed}"
+    )
+
+
+def get_train_model_info_class_dir(
+    model: str,
+    dataset: str,
+    seed: int,
+    label: int,
+) -> Path:
+    """Path to class-specific training auxiliaries."""
+    return get_train_model_info_dir(model, dataset, seed).joinpath(f"class_{label}")
 
 
 def get_samples_dir(model: str, dataset: str, seed: int) -> Path:

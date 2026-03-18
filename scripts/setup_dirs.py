@@ -27,6 +27,7 @@ from config.const import (
     RESULTS_SAMPLES_DIR,
     SCRIPTS_DIR,
     SRC_DIR,
+    TRAIN_MODEL_INFO_DIR,
 )
 
 DIRECTORIES = [
@@ -35,6 +36,7 @@ DIRECTORIES = [
     DATA_PROCESSED_DIR,
     LOGS_DIR,
     MODELS_DIR,
+    TRAIN_MODEL_INFO_DIR,
     RESULTS_METRICS_DIR,
     RESULTS_FIGURES_DIR,
     RESULTS_SAMPLES_DIR,
@@ -47,6 +49,7 @@ GITKEEP_DIRS = [
     DATA_PROCESSED_DIR,
     LOGS_DIR,
     MODELS_DIR,
+    TRAIN_MODEL_INFO_DIR,
     RESULTS_METRICS_DIR,
     RESULTS_FIGURES_DIR,
     RESULTS_SAMPLES_DIR,
@@ -104,6 +107,7 @@ def create_gitignore(verbose: bool = False) -> None:
         DATA_RAW_DIR: "*.csv\n*.parquet\n*.xlsx\n*.json\n!.gitkeep\n",
         DATA_PROCESSED_DIR: "*.csv\n*.parquet\n!.gitkeep\n",
         MODELS_DIR: "*\n!.gitkeep\n",
+        TRAIN_MODEL_INFO_DIR: "*\n!.gitkeep\n",
         LOGS_DIR: "*.log\n!.gitkeep\n",
     }
     for directory, rules in ignore_rules.items():
