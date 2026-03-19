@@ -11,3 +11,4 @@ testing_stuff.ipynb
 # Agents and skills configurations
 AGENTS.md
 /.agents
+/.vscode
