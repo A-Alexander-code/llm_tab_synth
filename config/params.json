@@ -1,9 +1,13 @@
 {
   "experiment": {
     "datasets": [
-      "diabetes-retin",
-      "T1D_child",
-      "heart_cleveland"
+      "heart_cardio",
+      "heart_cleveland",
+      "heart_disease",
+      "heart_framingham",
+      "heart_hungarian",
+      "heart_switzerland",
+      "heart_va"
     ],
     "models": [
       "great",
@@ -17,17 +21,17 @@
       "forestdiffusion",
       "mostlyai"
     ],
-    "seeds": [42, 63],
-    "imbalance_ratios": [0.5, 0.75, 1],
-    "n_samples_per_class": 500,
+    "seeds": [13, 23, 42, 69, 88],
+    "imbalance_ratios": [0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
+    "n_samples_per_class": 700,
     "target_column": "class",
     "test_split": 0.2
   },
   "model_params": {
     "great": {
       "llm": "distilgpt2",
-      "batch_size": 8,
-      "epochs": 75,
+      "batch_size": 16,
+      "epochs": 200,
       "fp16": false,
       "dataloader_num_workers": 4,
       "gradient_checkpointing": true,
@@ -35,14 +39,14 @@
     },
     "tabula": {
       "llm": "distilgpt2",
-      "batch_size": 32,
-      "epochs": 50,
+      "batch_size": 16,
+      "epochs": 200,
       "cuda_device": "0"
     },
     "realtabformer": {
       "model_type": "tabular",
-      "epochs": 100,
-      "batch_size": 8,
+      "epochs": 200,
+      "batch_size": 16,
       "gradient_accumulation_steps": 4,
       "early_stopping_patience": 5,
       "cuda_device": "0",
