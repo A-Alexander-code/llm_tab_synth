@@ -1,5 +1,4 @@
-"""Evaluate synthetic tabular samples against utility and privacy metrics.
-
+"""Evaluate synthetic tabular samples with utility and privacy metrics.
 Usage:
     python main_evaluator.py
     python main_evaluator.py --datasets diabetes-retin --models ctgan
@@ -21,7 +20,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-ROOT        = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parent
 CONFIG_PATH = ROOT.joinpath("config").joinpath("params.json")
 
 sys.path.insert(0, str(ROOT))
@@ -36,12 +35,13 @@ from src.evaluation.privacy import (compute_exact_matches,
                                     compute_dcr, 
                                     compute_dcr_holdout, 
                                     compute_mia, 
-                                    compute_attribute_inference,)
+                                    compute_attribute_inference, 
+                                    compute_nnaa, 
+                                    compute_kanonymity,)
 from src.evaluation.aggregator import (build_rows, 
                                        save_combination_csv, 
-                                       append_to_master,
+                                       append_to_master, 
                                        save_aggregated,)
-
 
 def _setup_logging(log_dir: Path) -> logging.Logger:
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -117,7 +117,7 @@ def _load_split(processed_dir: Path, target: str) -> tuple[pd.DataFrame, pd.Data
     train_df = pd.DataFrame(X_train, columns=feature_names)
     test_df  = pd.DataFrame(X_test,  columns=feature_names)
     train_df[target] = y_train.astype(int)
-    test_df[target]  = y_test.astype(int)
+    test_df[target] = y_test.astype(int)
 
     return train_df, test_df
 
@@ -201,12 +201,22 @@ def _evaluate_combination(
     except Exception:
         logger.warning(f"[{dataset}|{model}|seed={seed}|ir={output_ir:.2f}] attribute_inference failed:\n{traceback.format_exc()}")
 
+    try:
+        all_rows += compute_nnaa(synth_feat, real_train_feat)
+    except Exception:
+        logger.warning(f"[{dataset}|{model}|seed={seed}|ir={output_ir:.2f}] nnaa failed:\n{traceback.format_exc()}")
+
+    try:
+        all_rows += compute_kanonymity(synth_feat, real_train_feat, real_test_feat)
+    except Exception:
+        logger.warning(f"[{dataset}|{model}|seed={seed}|ir={output_ir:.2f}] kanonymity failed:\n{traceback.format_exc()}")
+
     return build_rows(all_rows, dataset=dataset, model=model, seed=seed, output_ir=output_ir)
 
 
 def parse_args(config: dict) -> argparse.Namespace:
     exp = config["experiment"]
-    parser = argparse.ArgumentParser(description="Evaluador de datos sintéticos tabulares")
+    parser = argparse.ArgumentParser(description="Synthetic tabular data evaluator")
     parser.add_argument("--config", type=str, default=str(CONFIG_PATH))
     parser.add_argument("--datasets", nargs="+", default=exp["datasets"])
     parser.add_argument("--models", nargs="+", default=exp["models"])
@@ -352,5 +362,5 @@ def run(args: argparse.Namespace, config: dict, logger: logging.Logger) -> None:
 if __name__ == "__main__":
     config = _load_config(CONFIG_PATH)
     logger = _setup_logging(ROOT.joinpath("logs"))
-    args = parse_args(config)
+    args   = parse_args(config)
     run(args, config, logger)

@@ -20,6 +20,8 @@ _BLOCK_EXACT = "privacy_exact"
 _BLOCK_DCR = "privacy_dcr"
 _BLOCK_MIA = "privacy_mia"
 _BLOCK_ATTINF = "privacy_attinf"
+_BLOCK_NNAA = "privacy_nnaa"
+_BLOCK_KANON = "privacy_kanonymity"
 
 def compute_exact_matches(synth: pd.DataFrame, 
                           real_train: pd.DataFrame,) -> list[dict[str, Any]]:
@@ -71,7 +73,7 @@ def compute_dcr_holdout(real_test: pd.DataFrame,
                         real_train: pd.DataFrame,) -> list[dict[str, Any]]:
     """Measure holdout-to-train nearest-neighbor distances as a baseline."""
     numeric_cols = real_train.select_dtypes(include=[np.number]).columns.tolist()
-    common_cols  = [c for c in numeric_cols if c in real_test.columns]
+    common_cols = [c for c in numeric_cols if c in real_test.columns]
     if not common_cols:
         return []
 
@@ -84,9 +86,9 @@ def compute_dcr_holdout(real_test: pd.DataFrame,
     dists = dists[:, 0]
 
     return [
-        {"block": _BLOCK_DCR, "metric": "dcr_holdout_mean",   "classifier": None, "value": float(np.mean(dists))},
+        {"block": _BLOCK_DCR, "metric": "dcr_holdout_mean", "classifier": None, "value": float(np.mean(dists))},
         {"block": _BLOCK_DCR, "metric": "dcr_holdout_median", "classifier": None, "value": float(np.median(dists))},
-        {"block": _BLOCK_DCR, "metric": "dcr_holdout_p5",     "classifier": None, "value": float(np.percentile(dists, 5))},
+        {"block": _BLOCK_DCR, "metric": "dcr_holdout_p5", "classifier": None, "value": float(np.percentile(dists, 5))},
     ]
 
 def compute_mia(synth: pd.DataFrame, 
@@ -110,7 +112,7 @@ def compute_mia(synth: pd.DataFrame,
 
     n = min(len(real_train), len(real_test))
     train_feats = _attack_features(real_train.sample(n=n, random_state=seed))
-    test_feats  = _attack_features(real_test.sample(n=n, random_state=seed))
+    test_feats = _attack_features(real_test.sample(n=n, random_state=seed))
 
     X_attack = np.vstack([train_feats, test_feats])
     y_attack = np.array([1] * n + [0] * n)
@@ -121,7 +123,7 @@ def compute_mia(synth: pd.DataFrame,
     ])
 
     n_splits = min(5, n // 2)
-    skf      = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=seed)
+    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=seed)
 
     all_proba = np.zeros(len(y_attack))
     with warnings.catch_warnings():
@@ -130,7 +132,7 @@ def compute_mia(synth: pd.DataFrame,
             clf.fit(X_attack[train_idx], y_attack[train_idx])
             all_proba[test_idx] = clf.predict_proba(X_attack[test_idx])[:, 1]
 
-    auc  = float(roc_auc_score(y_attack, all_proba))
+    auc = float(roc_auc_score(y_attack, all_proba))
 
     pred = (all_proba >= 0.5).astype(int)
     tp = int(((pred == 1) & (y_attack == 1)).sum())
@@ -146,8 +148,8 @@ def compute_mia(synth: pd.DataFrame,
     tpr_at_fpr01 = float(tpr_vals[mask].max()) if mask.any() else 0.0
 
     return [
-        {"block": _BLOCK_MIA, "metric": "mia_auc",          "classifier": None, "value": auc},
-        {"block": _BLOCK_MIA, "metric": "mia_advantage",    "classifier": None, "value": advantage},
+        {"block": _BLOCK_MIA, "metric": "mia_auc", "classifier": None, "value": auc},
+        {"block": _BLOCK_MIA, "metric": "mia_advantage", "classifier": None, "value": advantage},
         {"block": _BLOCK_MIA, "metric": "mia_tpr_at_fpr01", "classifier": None, "value": tpr_at_fpr01},
     ]
 
@@ -155,7 +157,7 @@ def _detect_sensitive_column(real_train: pd.DataFrame,
                              target: str = "class",) -> str | None:
     """Return the non-target numeric column most correlated with the target."""
     numeric_cols = real_train.select_dtypes(include=[np.number]).columns.tolist()
-    candidates = [c for c in numeric_cols if c != target]
+    candidates   = [c for c in numeric_cols if c != target]
     if not candidates or target not in real_train.columns:
         return None
 
@@ -164,8 +166,8 @@ def _detect_sensitive_column(real_train: pd.DataFrame,
 
 
 def compute_attribute_inference(synth: pd.DataFrame, 
-                                real_train: pd.DataFrame, 
-                                real_test: pd.DataFrame, 
+                                real_train: pd.DataFrame,
+                                real_test: pd.DataFrame,
                                 target: str = "class", 
                                 seed: int = 42,) -> list[dict[str, Any]]:
     """Measure attribute inference risk on the most target-correlated column."""
@@ -184,7 +186,7 @@ def compute_attribute_inference(synth: pd.DataFrame,
         return X, y
 
     X_train, y_train = _prepare(real_train)
-    X_test,  y_test = _prepare(real_test)
+    X_test, y_test = _prepare(real_test)
     X_synth, y_synth = _prepare(synth)
 
     clf = Pipeline([
@@ -217,5 +219,86 @@ def compute_attribute_inference(synth: pd.DataFrame,
             ]
         except Exception as e:
             rows.append({"block": _BLOCK_ATTINF, "metric": "attinf_error", "classifier": None, "value": str(e)})
+
+    return rows
+
+def compute_nnaa(synth: pd.DataFrame, 
+                 real_train: pd.DataFrame,) -> list[dict[str, Any]]:
+    """Compute nearest-neighbor adversarial accuracy."""
+    numeric_cols = real_train.select_dtypes(include=[np.number]).columns.tolist()
+    common_cols = [c for c in numeric_cols if c in synth.columns]
+    if not common_cols:
+        return []
+
+    scaler = StandardScaler()
+    real_scaled = scaler.fit_transform(real_train[common_cols].fillna(0))
+    synth_scaled = scaler.transform(synth[common_cols].fillna(0))
+
+    tree_real = BallTree(real_scaled,  metric="euclidean")
+    tree_synth = BallTree(synth_scaled, metric="euclidean")
+
+    n_real = len(real_scaled)
+    n_synth = len(synth_scaled)
+
+    d_r_real, _ = tree_real.query(real_scaled,  k=min(2, n_real))
+    d_s_real, _ = tree_synth.query(real_scaled, k=1)
+    d_r_real = d_r_real[:, -1]
+    d_s_real = d_s_real[:, 0]
+    acc_real = float(np.mean(d_r_real < d_s_real))
+
+    d_s_synth, _ = tree_synth.query(synth_scaled, k=min(2, n_synth))
+    d_r_synth, _ = tree_real.query(synth_scaled,  k=1)
+    d_s_synth = d_s_synth[:, -1]
+    d_r_synth = d_r_synth[:, 0]
+    acc_synth = float(np.mean(d_s_synth < d_r_synth))
+
+    nnaa = 0.5 * (acc_real + acc_synth)
+
+    return [
+        {"block": _BLOCK_NNAA, "metric": "nnaa", "classifier": None, "value": nnaa},
+        {"block": _BLOCK_NNAA, "metric": "nnaa_acc_real", "classifier": None, "value": acc_real},
+        {"block": _BLOCK_NNAA, "metric": "nnaa_acc_synth", "classifier": None, "value": acc_synth},
+    ]
+
+def compute_kanonymity(synth: pd.DataFrame, 
+                       real_train: pd.DataFrame, 
+                       real_test: pd.DataFrame, 
+                       k_values: list[int] | None = None, 
+                       epsilon_percentile: float = 25.0,) -> list[dict[str, Any]]:
+    """Measure synthetic k-anonymity against the real training set."""
+    if k_values is None:
+        k_values = [3, 5]
+
+    numeric_cols = real_train.select_dtypes(include=[np.number]).columns.tolist()
+    common_cols = [c for c in numeric_cols if c in synth.columns and c in real_test.columns]
+    if not common_cols:
+        return []
+
+    scaler = StandardScaler()
+    real_scaled = scaler.fit_transform(real_train[common_cols].fillna(0))
+    test_scaled = scaler.transform(real_test[common_cols].fillna(0))
+
+    tree_real = BallTree(real_scaled, metric="euclidean")
+    holdout_dists, _ = tree_real.query(test_scaled, k=1)
+    epsilon = float(np.percentile(holdout_dists[:, 0], epsilon_percentile))
+
+    if epsilon <= 0:
+        epsilon = 1e-6
+
+    synth_scaled = scaler.transform(synth[common_cols].fillna(0))
+    neighbor_counts = tree_real.query_radius(synth_scaled, r=epsilon, count_only=True)
+
+    rows: list[dict[str, Any]] = [
+        {"block": _BLOCK_KANON, "metric": "kanon_epsilon", "classifier": None, "value": epsilon},
+    ]
+
+    for k in k_values:
+        is_kanon = neighbor_counts >= k
+        kanon_count = int(is_kanon.sum())
+        kanon_ratio = float(kanon_count / max(len(synth_scaled), 1))
+        rows += [
+            {"block": _BLOCK_KANON, "metric": f"kanon_k{k}_ratio", "classifier": None, "value": kanon_ratio},
+            {"block": _BLOCK_KANON, "metric": f"kanon_k{k}_count", "classifier": None, "value": float(kanon_count)},
+        ]
 
     return rows
