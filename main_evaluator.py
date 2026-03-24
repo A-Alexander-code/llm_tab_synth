@@ -5,6 +5,7 @@ Usage:
     python main_evaluator.py --models great --seeds 42
     python main_evaluator.py --ir 0.5 0.75 1.0
     python main_evaluator.py --dry-run
+    python main_evaluator.py --save-classifiers true
 """
 
 from __future__ import annotations
@@ -77,8 +78,7 @@ def _samples_dir(root: Path, model: str, dataset: str, seed: int) -> Path:
 
 
 def _metrics_combination_path(
-    root: Path, dataset: str, model: str, seed: int, output_ir: float
-) -> Path:
+    root: Path, dataset: str, model: str, seed: int, output_ir: float) -> Path:
     return (
         root.joinpath("results")
         .joinpath("metrics_raw")
@@ -98,6 +98,18 @@ def _aggregated_path(root: Path, dataset: str) -> Path:
     return root.joinpath("results").joinpath("metrics_aggregated").joinpath(f"{dataset}_aggregated.csv")
 
 
+def _classifiers_dir(
+    root: Path, dataset: str, model: str, seed: int, output_ir: float) -> Path:
+    return (
+        root.joinpath("results")
+        .joinpath("classifiers")
+        .joinpath(dataset)
+        .joinpath(model)
+        .joinpath(f"seed_{seed}")
+        .joinpath(f"ir_{output_ir:.2f}")
+    )
+
+
 def _load_split(processed_dir: Path, target: str) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Load train/test arrays and rebuild DataFrames with the target column."""
     meta_path = processed_dir.joinpath("feature_meta.json")
@@ -115,7 +127,7 @@ def _load_split(processed_dir: Path, target: str) -> tuple[pd.DataFrame, pd.Data
     y_test = np.load(str(processed_dir.joinpath("y_test.npy")))
 
     train_df = pd.DataFrame(X_train, columns=feature_names)
-    test_df  = pd.DataFrame(X_test,  columns=feature_names)
+    test_df = pd.DataFrame(X_test, columns=feature_names)
     train_df[target] = y_train.astype(int)
     test_df[target] = y_test.astype(int)
 
@@ -135,81 +147,56 @@ def _load_synthetic(samples_dir: Path) -> tuple[pd.DataFrame, pd.DataFrame] | No
     return synth_0, synth_1
 
 
-def _evaluate_combination(
-    dataset: str,
-    model: str,
-    seed: int,
-    output_ir: float,
-    synth_final: pd.DataFrame,
-    real_train: pd.DataFrame,
-    real_test: pd.DataFrame,
-    target: str,
-    logger: logging.Logger,
-) -> list[dict]:
+def _timed_block(fn, label: str, 
+                 prefix: str, logger: logging.Logger, 
+                 *args, **kwargs,) -> list[dict]:
+    """Run one metric block, log its duration, and return its rows."""
+    t0 = datetime.now()
+    try:
+        result = fn(*args, **kwargs)
+        elapsed = (datetime.now() - t0).total_seconds()
+        logger.info(f"{prefix}   ✓ {label:<30s} {elapsed:5.1f}s  ({len(result)} rows)")
+        return result
+    except Exception:
+        elapsed = (datetime.now() - t0).total_seconds()
+        logger.warning(
+            f"{prefix}   ✗ {label:<30s} {elapsed:5.1f}s  FAILED\n{traceback.format_exc()}"
+        )
+        return []
+
+
+def _evaluate_combination(dataset: str, model: str, 
+                          seed: int, output_ir: float, 
+                          synth_final: pd.DataFrame, real_train: pd.DataFrame, 
+                          real_test: pd.DataFrame, target: str, 
+                          logger: logging.Logger, classifiers_dir: Path | None = None,) -> list[dict]:
     """Run all evaluation blocks for one dataset/model/seed/IR combination."""
+    prefix = f"[{dataset}|seed={seed}|{model}|ir={output_ir:.2f}]"
     all_rows = []
 
-    # Drop target for feature-only metrics.
     real_train_feat = real_train.drop(columns=[target], errors="ignore")
     real_test_feat = real_test.drop(columns=[target],  errors="ignore")
     synth_feat = synth_final.drop(columns=[target], errors="ignore")
 
-    try:
-        all_rows += compute_univariate(real_train_feat, synth_feat)
-    except Exception:
-        logger.warning(f"[{dataset}|{model}|seed={seed}|ir={output_ir:.2f}] univariate failed:\n{traceback.format_exc()}")
+    all_rows += _timed_block(compute_univariate, "univariate", prefix, logger, real_train_feat, synth_feat)
+    all_rows += _timed_block(compute_multivariate, "multivariate", prefix, logger, real_train_feat, synth_feat)
+    all_rows += _timed_block(compute_detectability, "detectability", prefix, logger, real_train_feat, synth_feat, seed=seed)
+    all_rows += _timed_block(
+        compute_ml_efficacy, "ml_efficacy (TRTR+TSTR)", prefix, logger,
+        real_train, real_test, synth_final,
+        target=target, seed=seed, classifiers_dir=classifiers_dir,
+    )
 
-    try:
-        all_rows += compute_multivariate(real_train_feat, synth_feat)
-    except Exception:
-        logger.warning(f"[{dataset}|{model}|seed={seed}|ir={output_ir:.2f}] multivariate failed:\n{traceback.format_exc()}")
-
-    try:
-        all_rows += compute_detectability(real_train_feat, synth_feat, seed=seed)
-    except Exception:
-        logger.warning(f"[{dataset}|{model}|seed={seed}|ir={output_ir:.2f}] detectability failed:\n{traceback.format_exc()}")
-
-    try:
-        all_rows += compute_ml_efficacy(real_train, real_test, synth_final, target=target, seed=seed)
-    except Exception:
-        logger.warning(f"[{dataset}|{model}|seed={seed}|ir={output_ir:.2f}] ml_efficacy failed:\n{traceback.format_exc()}")
-
-    try:
-        all_rows += compute_exact_matches(synth_feat, real_train_feat)
-    except Exception:
-        logger.warning(f"[{dataset}|{model}|seed={seed}|ir={output_ir:.2f}] exact_matches failed:\n{traceback.format_exc()}")
-
-    try:
-        all_rows += compute_dcr(synth_feat, real_train_feat)
-    except Exception:
-        logger.warning(f"[{dataset}|{model}|seed={seed}|ir={output_ir:.2f}] dcr failed:\n{traceback.format_exc()}")
-
-    try:
-        all_rows += compute_dcr_holdout(real_test_feat, real_train_feat)
-    except Exception:
-        logger.warning(f"[{dataset}|{model}|seed={seed}|ir={output_ir:.2f}] dcr_holdout failed:\n{traceback.format_exc()}")
-
-    try:
-        all_rows += compute_mia(synth_feat, real_train_feat, real_test_feat, seed=seed)
-    except Exception:
-        logger.warning(f"[{dataset}|{model}|seed={seed}|ir={output_ir:.2f}] mia failed:\n{traceback.format_exc()}")
-
-    try:
-        all_rows += compute_attribute_inference(
-            synth_final, real_train, real_test, target=target, seed=seed
-        )
-    except Exception:
-        logger.warning(f"[{dataset}|{model}|seed={seed}|ir={output_ir:.2f}] attribute_inference failed:\n{traceback.format_exc()}")
-
-    try:
-        all_rows += compute_nnaa(synth_feat, real_train_feat)
-    except Exception:
-        logger.warning(f"[{dataset}|{model}|seed={seed}|ir={output_ir:.2f}] nnaa failed:\n{traceback.format_exc()}")
-
-    try:
-        all_rows += compute_kanonymity(synth_feat, real_train_feat, real_test_feat)
-    except Exception:
-        logger.warning(f"[{dataset}|{model}|seed={seed}|ir={output_ir:.2f}] kanonymity failed:\n{traceback.format_exc()}")
+    all_rows += _timed_block(compute_exact_matches, "exact_matches", prefix, logger, synth_feat, real_train_feat)
+    all_rows += _timed_block(compute_dcr, "dcr", prefix, logger, synth_feat, real_train_feat)
+    all_rows += _timed_block(compute_dcr_holdout, "dcr_holdout", prefix, logger, real_test_feat, real_train_feat)
+    all_rows += _timed_block(compute_mia, "mia", prefix, logger, synth_feat, real_train_feat, real_test_feat, seed=seed)
+    all_rows += _timed_block(
+        compute_attribute_inference, "attribute_inference", prefix, logger,
+        synth_final, real_train, real_test, target=target, seed=seed,
+    )
+    all_rows += _timed_block(compute_nnaa, "nnaa", prefix, logger, synth_feat, real_train_feat)
+    all_rows += _timed_block(compute_kanonymity, "k_anonymity", prefix, logger, synth_feat, real_train_feat, real_test_feat)
 
     return build_rows(all_rows, dataset=dataset, model=model, seed=seed, output_ir=output_ir)
 
@@ -223,6 +210,19 @@ def parse_args(config: dict) -> argparse.Namespace:
     parser.add_argument("--seeds", nargs="+", type=int, default=exp["seeds"])
     parser.add_argument("--ir", nargs="+", type=float, default=exp["imbalance_ratios"])
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--save-classifiers",
+        type=lambda x: x.lower() in ("true", "1", "yes"),
+        default=False,
+        metavar="BOOL",
+        help=(
+            "Save trained TSTR models as .pkl files in "
+            "results/classifiers/{dataset}/{model}/seed_{seed}/ir_{ir}/. "
+            "Only TSTR models are persisted, not TRTR. "
+            "Accepted values: true/false, 1/0, yes/no. "
+            "Default: false."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -233,14 +233,17 @@ def run(args: argparse.Namespace, config: dict, logger: logging.Logger) -> None:
     seeds = args.seeds
     output_irs = sorted(args.ir)
 
-    total = len(datasets) * len(seeds) * len(models) * len(output_irs)
+    total_combinations = len(datasets) * len(seeds) * len(models) * len(output_irs)
+    run_start = datetime.now()
+
     logger.info("=" * 60)
     logger.info("main_evaluator started")
-    logger.info(f"Datasets: {datasets}")
-    logger.info(f"Models: {models}")
-    logger.info(f"Seeds: {seeds}")
-    logger.info(f"Output IR: {output_irs}")
-    logger.info(f"Total combinations: {total}")
+    logger.info(f"  Datasets: {datasets}")
+    logger.info(f"  Models: {models}")
+    logger.info(f"  Seeds: {seeds}")
+    logger.info(f"  Output IR: {output_irs}")
+    logger.info(f"  Save classifiers: {args.save_classifiers}")
+    logger.info(f"  Total combinations: {total_combinations}")
     logger.info("=" * 60)
 
     if args.dry_run:
@@ -252,66 +255,91 @@ def run(args: argparse.Namespace, config: dict, logger: logging.Logger) -> None:
                         logger.info(f"  {ds} | seed={seed} | {model} | ir={ir:.2f}")
         return
 
+    combo_idx = 0
+    n_errors = 0
+    n_skipped = 0
+
     for dataset in datasets:
         master_path = _master_path(ROOT, dataset)
+        dataset_start = datetime.now()
 
-        # Rebuild the master CSV on each full run.
         if master_path.exists():
             master_path.unlink()
             logger.info(f"[{dataset}] Cleared existing master CSV.")
 
-        n_errors = 0
-
         for seed in seeds:
             set_global_seed(seed)
-
             proc_dir = _processed_dir(ROOT, dataset, seed)
+
             try:
                 real_train, real_test = _load_split(proc_dir, target)
+                n0 = int((real_train[target] == 0).sum())
+                n1 = int((real_train[target] == 1).sum())
                 logger.info(
                     f"[{dataset}|seed={seed}] Split loaded — "
-                    f"train={len(real_train)}, test={len(real_test)}"
+                    f"train={len(real_train)} (class_0={n0}, class_1={n1}), "
+                    f"test={len(real_test)}"
                 )
             except Exception:
-                logger.error(f"[{dataset}|seed={seed}] Failed to load split:\n{traceback.format_exc()}")
+                logger.error(
+                    f"[{dataset}|seed={seed}] Failed to load split:\n{traceback.format_exc()}"
+                )
                 n_errors += 1
+                combo_idx += len(models) * len(output_irs)
                 continue
 
             for model in models:
                 sdir = _samples_dir(ROOT, model, dataset, seed)
                 result = _load_synthetic(sdir)
+                model_start = datetime.now()
 
                 if result is None:
                     logger.warning(
-                        f"[{dataset}|seed={seed}|{model}] Synthetic samples not found in {sdir}. Skipping."
+                        f"[{dataset}|seed={seed}|{model}] "
+                        f"Synthetic samples not found in {sdir}. Skipping."
                     )
-                    n_errors += 1
+                    n_skipped += len(output_irs)
+                    combo_idx += len(output_irs)
                     continue
 
                 synth_0, synth_1 = result
+                n0_s = len(real_train[real_train[target] == 0])
+                n1_s = len(real_train[real_train[target] == 1])
+                maj_label = 0 if n0_s >= n1_s else 1
+                synth_maj, synth_min = (synth_0, synth_1) if maj_label == 0 else (synth_1, synth_0)
+
                 logger.info(
-                    f"[{dataset}|seed={seed}|{model}] Synthetic loaded — "
-                    f"class_0={len(synth_0)}, class_1={len(synth_1)}"
+                    f"[{dataset}|seed={seed}|{model}] "
+                    f"Synthetic loaded — class_0={len(synth_0)}, class_1={len(synth_1)}  "
+                    f"(majority=class_{maj_label})"
                 )
 
-                # Match majority/minority classes to the real train split.
-                n0 = len(real_train[real_train[target] == 0])
-                n1 = len(real_train[real_train[target] == 1])
-                if n0 >= n1:
-                    synth_maj, synth_min = synth_0, synth_1
-                else:
-                    synth_maj, synth_min = synth_1, synth_0
-
+                ir_errors = 0
                 for output_ir in output_irs:
+                    combo_idx += 1
+                    elapsed_total = (datetime.now() - run_start).total_seconds()
+                    pct = 100.0 * combo_idx / total_combinations
+
                     logger.info(
-                        f"[{dataset}|seed={seed}|{model}|ir={output_ir:.2f}] Evaluating..."
+                        f"[{dataset}|seed={seed}|{model}|ir={output_ir:.2f}] "
+                        f"── combo {combo_idx}/{total_combinations} ({pct:.0f}%)  "
+                        f"elapsed={elapsed_total:.0f}s ──"
                     )
+
+                    t0_combo = datetime.now()
                     try:
                         synth_final = build_synthetic_dataset(
                             synth_maj=synth_maj,
                             synth_min=synth_min,
                             output_ir=output_ir,
                             seed=seed,
+                        )
+                        n_maj_f = int((synth_final["class"] == maj_label).sum())
+                        n_min_f = int((synth_final["class"] != maj_label).sum())
+                        logger.info(
+                            f"[{dataset}|seed={seed}|{model}|ir={output_ir:.2f}] "
+                            f"   Synthetic dataset: {len(synth_final)} rows "
+                            f"(maj={n_maj_f}, min={n_min_f})"
                         )
 
                         rows = _evaluate_combination(
@@ -324,43 +352,62 @@ def run(args: argparse.Namespace, config: dict, logger: logging.Logger) -> None:
                             real_test=real_test,
                             target=target,
                             logger=logger,
+                            classifiers_dir=(
+                                _classifiers_dir(ROOT, dataset, model, seed, output_ir)
+                                if args.save_classifiers else None
+                            ),
                         )
 
                         comb_path = _metrics_combination_path(ROOT, dataset, model, seed, output_ir)
                         save_combination_csv(rows, comb_path)
-
                         append_to_master(rows, master_path)
 
+                        combo_elapsed = (datetime.now() - t0_combo).total_seconds()
                         logger.info(
                             f"[{dataset}|seed={seed}|{model}|ir={output_ir:.2f}] "
-                            f"Done — {len(rows)} metric rows saved."
+                            f"   Done in {combo_elapsed:.1f}s — {len(rows)} metric rows saved."
                         )
 
                     except Exception:
+                        combo_elapsed = (datetime.now() - t0_combo).total_seconds()
                         logger.error(
                             f"[{dataset}|seed={seed}|{model}|ir={output_ir:.2f}] "
-                            f"Evaluation failed:\n{traceback.format_exc()}"
+                            f"   Combination failed after {combo_elapsed:.1f}s:\n{traceback.format_exc()}"
                         )
-                        n_errors += 1
+                        n_errors  += 1
+                        ir_errors += 1
 
+                model_elapsed = (datetime.now() - model_start).total_seconds()
+                logger.info(
+                    f"[{dataset}|seed={seed}|{model}] "
+                    f"Finished — {len(output_irs)} IRs in {model_elapsed:.1f}s"
+                    + (f", {ir_errors} errors" if ir_errors else "")
+                )
+
+        dataset_elapsed = (datetime.now() - dataset_start).total_seconds()
         try:
             agg_path = _aggregated_path(ROOT, dataset)
             agg_df = save_aggregated(master_path, agg_path)
             logger.info(
-                f"[{dataset}] Aggregated results saved to {agg_path} "
-                f"({len(agg_df)} rows)."
+                f"[{dataset}] Aggregation done — {len(agg_df)} rows → {agg_path}  "
+                f"(dataset total: {dataset_elapsed:.1f}s)"
             )
         except Exception:
             logger.error(f"[{dataset}] Aggregation failed:\n{traceback.format_exc()}")
             n_errors += 1
 
+    total_elapsed = (datetime.now() - run_start).total_seconds()
     logger.info("=" * 60)
-    logger.info(f"main_evaluator finished. Total errors: {n_errors}")
+    logger.info(
+        f"main_evaluator finished — "
+        f"{combo_idx} combinations in {total_elapsed:.1f}s  "
+        f"(errors={n_errors}, skipped={n_skipped})"
+    )
     logger.info("=" * 60)
 
 
 if __name__ == "__main__":
     config = _load_config(CONFIG_PATH)
     logger = _setup_logging(ROOT.joinpath("logs"))
-    args   = parse_args(config)
+    args = parse_args(config)
     run(args, config, logger)

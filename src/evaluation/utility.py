@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import warnings
+from pathlib import Path
 from typing import Any
 
 import numpy as np
 import pandas as pd
-import copy
 from scipy.spatial.distance import jensenshannon
 from scipy.stats import ks_2samp, wasserstein_distance
 from sklearn.ensemble import RandomForestClassifier
@@ -47,7 +47,8 @@ def _histogram_probs(a: np.ndarray, b: np.ndarray, bins: int = 50) -> tuple[np.n
     return p, q
 
 
-def compute_univariate(real: pd.DataFrame, synth: pd.DataFrame,) -> list[dict[str, Any]]:
+def compute_univariate(real: pd.DataFrame, 
+                       synth: pd.DataFrame,) -> list[dict[str, Any]]:
     """Compute per-column and mean univariate distance metrics."""
     rows = []
     numeric_cols = real.select_dtypes(include=[np.number]).columns.tolist()
@@ -69,18 +70,19 @@ def compute_univariate(real: pd.DataFrame, synth: pd.DataFrame,) -> list[dict[st
         wd_vals.append(wd)
         jsd_vals.append(jsd)
 
-        rows.append({"block": _BLOCK_UNIVARIATE, "metric": f"ks_{col}",          "classifier": None, "value": ks_stat})
-        rows.append({"block": _BLOCK_UNIVARIATE, "metric": f"wasserstein_{col}",  "classifier": None, "value": wd})
-        rows.append({"block": _BLOCK_UNIVARIATE, "metric": f"jsd_{col}",          "classifier": None, "value": jsd})
+        rows.append({"block": _BLOCK_UNIVARIATE, "metric": f"ks_{col}", "classifier": None, "value": ks_stat})
+        rows.append({"block": _BLOCK_UNIVARIATE, "metric": f"wasserstein_{col}", "classifier": None, "value": wd})
+        rows.append({"block": _BLOCK_UNIVARIATE, "metric": f"jsd_{col}", "classifier": None, "value": jsd})
 
     if ks_vals:
-        rows.append({"block": _BLOCK_UNIVARIATE, "metric": "ks_mean",          "classifier": None, "value": float(np.mean(ks_vals))})
+        rows.append({"block": _BLOCK_UNIVARIATE, "metric": "ks_mean", "classifier": None, "value": float(np.mean(ks_vals))})
         rows.append({"block": _BLOCK_UNIVARIATE, "metric": "wasserstein_mean", "classifier": None, "value": float(np.mean(wd_vals))})
-        rows.append({"block": _BLOCK_UNIVARIATE, "metric": "jsd_mean",         "classifier": None, "value": float(np.mean(jsd_vals))})
+        rows.append({"block": _BLOCK_UNIVARIATE, "metric": "jsd_mean", "classifier": None, "value": float(np.mean(jsd_vals))})
 
     return rows
 
-def compute_multivariate(real: pd.DataFrame, synth: pd.DataFrame,) -> list[dict[str, Any]]:
+def compute_multivariate(real: pd.DataFrame, 
+                         synth: pd.DataFrame,) -> list[dict[str, Any]]:
     """Compute the Frobenius distance between Pearson correlation matrices."""
     numeric_cols = real.select_dtypes(include=[np.number]).columns.tolist()
     if len(numeric_cols) < 2:
@@ -95,17 +97,19 @@ def compute_multivariate(real: pd.DataFrame, synth: pd.DataFrame,) -> list[dict[
         {"block": _BLOCK_MULTIVARIATE, "metric": "corr_frobenius", "classifier": None, "value": frobenius}
     ]
 
-def compute_detectability(real: pd.DataFrame,synth: pd.DataFrame,seed: int = 42,) -> list[dict[str, Any]]:
+def compute_detectability(real: pd.DataFrame, 
+                          synth: pd.DataFrame,
+                          seed: int = 42,) -> list[dict[str, Any]]:
     """Measure how well logistic regression separates real from synthetic data."""
     numeric_cols = real.select_dtypes(include=[np.number]).columns.tolist()
     if not numeric_cols:
         return []
 
-    real_feat= real[numeric_cols].fillna(0)
+    real_feat = real[numeric_cols].fillna(0)
     synth_feat = synth[numeric_cols].fillna(0)
 
     n = min(len(real_feat), len(synth_feat))
-    real_feat  = real_feat.sample(n=n, random_state=seed).reset_index(drop=True)
+    real_feat = real_feat.sample(n=n, random_state=seed).reset_index(drop=True)
     synth_feat = synth_feat.sample(n=n, random_state=seed).reset_index(drop=True)
 
     X = pd.concat([real_feat, synth_feat], ignore_index=True).values
@@ -131,7 +135,7 @@ def compute_detectability(real: pd.DataFrame,synth: pd.DataFrame,seed: int = 42,
 
     return [
         {"block": _BLOCK_DETECTABILITY, "metric": "propensity_auc", "classifier": None, "value": float(np.mean(aucs))},
-        {"block": _BLOCK_DETECTABILITY, "metric": "pmse",           "classifier": None, "value": float(np.mean(pmses))},
+        {"block": _BLOCK_DETECTABILITY, "metric": "pmse", "classifier": None, "value": float(np.mean(pmses))},
     ]
 
 def _get_classifiers(seed: int) -> dict[str, Any]:
@@ -155,13 +159,14 @@ def _get_classifiers(seed: int) -> dict[str, Any]:
     return clfs
 
 
-def _evaluate_classifier(clf, X_train: np.ndarray, 
-                         y_train: np.ndarray, 
-                         X_test: np.ndarray, 
-                         y_test: np.ndarray, 
-                         clf_name: str, 
-                         mode: str,) -> list[dict[str, Any]]:
-    """Fit one classifier and return its evaluation rows."""
+def _evaluate_classifier(clf, 
+                         X_train: np.ndarray, y_train: np.ndarray, 
+                         X_test: np.ndarray, y_test: np.ndarray, 
+                         clf_name: str, mode: str, 
+                         save_path: Path | None = None,) -> list[dict[str, Any]]:
+    """Fit one classifier, optionally persist it, and return evaluation rows."""
+    import pickle  # noqa: PLC0415
+
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         clf.fit(X_train, y_train)
@@ -172,11 +177,15 @@ def _evaluate_classifier(clf, X_train: np.ndarray,
     auc_prc = average_precision_score(y_test, proba)
     f1 = f1_score(y_test, pred, zero_division=0)
 
-    prefix = f"{mode}"
+    if save_path is not None:
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        with save_path.open("wb") as f:
+            pickle.dump(clf, f)
+
     return [
-        {"block": _BLOCK_ML, "metric": f"{prefix}_aucroc", "classifier": clf_name, "value": float(auc_roc)},
-        {"block": _BLOCK_ML, "metric": f"{prefix}_auprc",  "classifier": clf_name, "value": float(auc_prc)},
-        {"block": _BLOCK_ML, "metric": f"{prefix}_f1",     "classifier": clf_name, "value": float(f1)},
+        {"block": _BLOCK_ML, "metric": f"{mode}_aucroc", "classifier": clf_name, "value": float(auc_roc)},
+        {"block": _BLOCK_ML, "metric": f"{mode}_auprc", "classifier": clf_name, "value": float(auc_prc)},
+        {"block": _BLOCK_ML, "metric": f"{mode}_f1", "classifier": clf_name, "value": float(f1)},
     ]
 
 
@@ -184,8 +193,11 @@ def compute_ml_efficacy(real_train: pd.DataFrame,
                         real_test: pd.DataFrame, 
                         synth: pd.DataFrame, 
                         target: str = "class", 
-                        seed: int = 42,) -> list[dict[str, Any]]:
+                        seed: int = 42, 
+                        classifiers_dir: Path | None = None,) -> list[dict[str, Any]]:
     """Compute TRTR and TSTR metrics across the configured classifiers."""
+    import copy  
+
     rows = []
 
     def _split(df: pd.DataFrame):
@@ -207,16 +219,22 @@ def compute_ml_efficacy(real_train: pd.DataFrame,
                 X_real_train, y_real_train,
                 X_real_test,  y_real_test,
                 clf_name, "trtr",
+                save_path=None,
             )
         except Exception as e:
             rows.append({"block": _BLOCK_ML, "metric": f"trtr_error_{clf_name}", "classifier": clf_name, "value": str(e)})
 
+        tstr_save_path = (
+            classifiers_dir.joinpath(f"{clf_name}_tstr.pkl")
+            if classifiers_dir is not None else None
+        )
         try:
             rows += _evaluate_classifier(
                 copy.deepcopy(clf),
                 X_synth, y_synth,
                 X_real_test, y_real_test,
                 clf_name, "tstr",
+                save_path=tstr_save_path,
             )
         except Exception as e:
             rows.append({"block": _BLOCK_ML, "metric": f"tstr_error_{clf_name}", "classifier": clf_name, "value": str(e)})
