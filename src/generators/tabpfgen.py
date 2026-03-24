@@ -7,8 +7,10 @@ from pathlib import Path
  
 import numpy as np
 import pandas as pd
+
  
 from src.generators.base import BaseGenerator
+from tabpfgen import TabPFGen 
  
  
 class TabpfgenGenerator(BaseGenerator):
@@ -29,14 +31,13 @@ class TabpfgenGenerator(BaseGenerator):
             pickle.dump({"X": X, "y": y, "feature_cols": feature_cols}, f)
  
     def sample(self, n_samples: int, model_dir: Path) -> pd.DataFrame:
-
-        from tabpfgen import TabPFGen  
+ 
  
         with model_dir.joinpath("train_data.pkl").open("rb") as f:
             state = pickle.load(f)
  
-        X_train: np.ndarray   = state["X"]
-        y_train: np.ndarray   = state["y"]
+        X_train: np.ndarray = state["X"]
+        y_train: np.ndarray = state["y"]
         feature_cols: list[str] = state["feature_cols"]
  
         unique_classes = np.unique(y_train).tolist()
