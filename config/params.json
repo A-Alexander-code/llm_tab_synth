@@ -89,7 +89,7 @@
     "mostlyai": {
       "max_training_time": 300,
       "max_epochs": 100,
-      "cuda_device": "cpu"
+      "cuda_device": "cuda"
     }
   }
 }
