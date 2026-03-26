@@ -1,13 +1,12 @@
 {
   "experiment": {
     "datasets": [
-      "heart_cardio",
-      "heart_cleveland",
-      "heart_disease",
+      "T1D_child",
       "heart_framingham",
-      "heart_hungarian",
-      "heart_switzerland",
-      "heart_va"
+      "breast_cancer",
+      "diabetic_retinopathy",
+      "diabetes_prima_indian",
+      "kidney_disease"
     ],
     "models": [
       "great",
