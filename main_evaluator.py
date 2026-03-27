@@ -1,12 +1,4 @@
-"""Evaluate synthetic tabular samples with utility and privacy metrics.
-Usage:
-    python main_evaluator.py
-    python main_evaluator.py --datasets diabetes-retin --models ctgan
-    python main_evaluator.py --models great --seeds 42
-    python main_evaluator.py --ir 0.5 0.75 1.0
-    python main_evaluator.py --dry-run
-    python main_evaluator.py --save-classifiers true
-"""
+"""Evaluate synthetic tabular samples with utility and privacy metrics."""
 
 from __future__ import annotations
 
@@ -42,7 +34,11 @@ from src.evaluation.privacy import (compute_exact_matches,
 from src.evaluation.aggregator import (build_rows, 
                                        save_combination_csv, 
                                        append_to_master, 
-                                       save_aggregated,)
+                                       save_aggregated, 
+                                       save_degenerate_audit,)
+from src.evaluation.degenerate import (get_valid_columns_for_statistical_metrics, 
+                                       compute_degenerate_diagnostics, 
+                                       build_degenerate_audit_rows,)
 
 def _setup_logging(log_dir: Path) -> logging.Logger:
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -77,8 +73,7 @@ def _samples_dir(root: Path, model: str, dataset: str, seed: int) -> Path:
     return root.joinpath("results").joinpath("samples").joinpath(model).joinpath(dataset).joinpath(f"seed_{seed}")
 
 
-def _metrics_combination_path(
-    root: Path, dataset: str, model: str, seed: int, output_ir: float) -> Path:
+def _metrics_combination_path(root: Path, dataset: str, model: str, seed: int, output_ir: float) -> Path:
     return (
         root.joinpath("results")
         .joinpath("metrics_raw")
@@ -98,8 +93,19 @@ def _aggregated_path(root: Path, dataset: str) -> Path:
     return root.joinpath("results").joinpath("metrics_aggregated").joinpath(f"{dataset}_aggregated.csv")
 
 
-def _classifiers_dir(
-    root: Path, dataset: str, model: str, seed: int, output_ir: float) -> Path:
+def _degenerate_audit_path(root: Path, dataset: str, model: str, seed: int, output_ir: float) -> Path:
+    return (
+        root.joinpath("results")
+        .joinpath("metrics_raw")
+        .joinpath(dataset)
+        .joinpath(model)
+        .joinpath(f"seed_{seed}")
+        .joinpath(f"ir_{output_ir:.2f}")
+        .joinpath("degenerate.csv")
+    )
+
+
+def _classifiers_dir(root: Path, dataset: str, model: str, seed: int, output_ir: float) -> Path:
     return (
         root.joinpath("results")
         .joinpath("classifiers")
@@ -107,6 +113,18 @@ def _classifiers_dir(
         .joinpath(model)
         .joinpath(f"seed_{seed}")
         .joinpath(f"ir_{output_ir:.2f}")
+    )
+
+
+def _degenerate_audit_path(root: Path, dataset: str, model: str, seed: int, output_ir: float) -> Path:
+    return (
+        root.joinpath("results")
+        .joinpath("metrics_raw")
+        .joinpath(dataset)
+        .joinpath(model)
+        .joinpath(f"seed_{seed}")
+        .joinpath(f"ir_{output_ir:.2f}")
+        .joinpath("degenerate.csv")
     )
 
 
@@ -127,9 +145,9 @@ def _load_split(processed_dir: Path, target: str) -> tuple[pd.DataFrame, pd.Data
     y_test = np.load(str(processed_dir.joinpath("y_test.npy")))
 
     train_df = pd.DataFrame(X_train, columns=feature_names)
-    test_df = pd.DataFrame(X_test, columns=feature_names)
+    test_df  = pd.DataFrame(X_test,  columns=feature_names)
     train_df[target] = y_train.astype(int)
-    test_df[target] = y_test.astype(int)
+    test_df[target]  = y_test.astype(int)
 
     return train_df, test_df
 
@@ -147,9 +165,12 @@ def _load_synthetic(samples_dir: Path) -> tuple[pd.DataFrame, pd.DataFrame] | No
     return synth_0, synth_1
 
 
-def _timed_block(fn, label: str, 
-                 prefix: str, logger: logging.Logger, 
-                 *args, **kwargs,) -> list[dict]:
+def _timed_block(fn, 
+                 label: str, 
+                 prefix: str, 
+                 logger: logging.Logger, 
+                 *args, 
+                 **kwargs,) -> list[dict]:
     """Run one metric block, log its duration, and return its rows."""
     t0 = datetime.now()
     try:
@@ -165,11 +186,17 @@ def _timed_block(fn, label: str,
         return []
 
 
-def _evaluate_combination(dataset: str, model: str, 
-                          seed: int, output_ir: float, 
-                          synth_final: pd.DataFrame, real_train: pd.DataFrame, 
-                          real_test: pd.DataFrame, target: str, 
-                          logger: logging.Logger, classifiers_dir: Path | None = None,) -> list[dict]:
+def _evaluate_combination(dataset: str, 
+                          model: str, 
+                          seed: int, 
+                          output_ir: float, 
+                          synth_final: pd.DataFrame, 
+                          real_train: pd.DataFrame, 
+                          real_test: pd.DataFrame, 
+                          target: str, 
+                          logger: logging.Logger, 
+                          classifiers_dir: Path | None = None, 
+                          audit_path: Path | None = None,) -> list[dict]:
     """Run all evaluation blocks for one dataset/model/seed/IR combination."""
     prefix = f"[{dataset}|seed={seed}|{model}|ir={output_ir:.2f}]"
     all_rows = []
@@ -177,6 +204,26 @@ def _evaluate_combination(dataset: str, model: str,
     real_train_feat = real_train.drop(columns=[target], errors="ignore")
     real_test_feat = real_test.drop(columns=[target],  errors="ignore")
     synth_feat = synth_final.drop(columns=[target], errors="ignore")
+
+    vcr = get_valid_columns_for_statistical_metrics(real_train_feat, synth_feat)
+    if vcr.excluded_cols:
+        affected = "multivariate, attribute_inference"
+        logger.info(
+            f"{prefix} Degenerate columns detected: "
+            f"synth_constant={len(vcr.synth_report.constant)}, "
+            f"real_constant={len(vcr.real_report.constant)}, "
+            f"union_excluded={len(vcr.excluded_cols)} "
+            f"({', '.join(vcr.excluded_cols)}) — "
+            f"excluded from: {affected}"
+        )
+        if audit_path is not None:
+            audit_rows = build_degenerate_audit_rows(vcr, dataset, model, seed, output_ir)
+            save_degenerate_audit(audit_rows, audit_path)
+
+    all_rows += _timed_block(
+        compute_degenerate_diagnostics, "degenerate_diagnostics",
+        prefix, logger, synth_feat, real_train_feat, vcr,
+    )
 
     all_rows += _timed_block(compute_univariate, "univariate", prefix, logger, real_train_feat, synth_feat)
     all_rows += _timed_block(compute_multivariate, "multivariate", prefix, logger, real_train_feat, synth_feat)
@@ -195,7 +242,7 @@ def _evaluate_combination(dataset: str, model: str,
         compute_attribute_inference, "attribute_inference", prefix, logger,
         synth_final, real_train, real_test, target=target, seed=seed,
     )
-    all_rows += _timed_block(compute_nnaa, "nnaa", prefix, logger, synth_feat, real_train_feat)
+    all_rows += _timed_block(compute_nnaa,       "nnaa",        prefix, logger, synth_feat, real_train_feat)
     all_rows += _timed_block(compute_kanonymity, "k_anonymity", prefix, logger, synth_feat, real_train_feat, real_test_feat)
 
     return build_rows(all_rows, dataset=dataset, model=model, seed=seed, output_ir=output_ir)
@@ -238,12 +285,12 @@ def run(args: argparse.Namespace, config: dict, logger: logging.Logger) -> None:
 
     logger.info("=" * 60)
     logger.info("main_evaluator started")
-    logger.info(f"  Datasets: {datasets}")
-    logger.info(f"  Models: {models}")
-    logger.info(f"  Seeds: {seeds}")
-    logger.info(f"  Output IR: {output_irs}")
-    logger.info(f"  Save classifiers: {args.save_classifiers}")
-    logger.info(f"  Total combinations: {total_combinations}")
+    logger.info(f"  Datasets:              {datasets}")
+    logger.info(f"  Models:                {models}")
+    logger.info(f"  Seeds:                 {seeds}")
+    logger.info(f"  Output IR:             {output_irs}")
+    logger.info(f"  Save classifiers:      {args.save_classifiers}")
+    logger.info(f"  Total combinations:    {total_combinations}")
     logger.info("=" * 60)
 
     if args.dry_run:
@@ -356,11 +403,19 @@ def run(args: argparse.Namespace, config: dict, logger: logging.Logger) -> None:
                                 _classifiers_dir(ROOT, dataset, model, seed, output_ir)
                                 if args.save_classifiers else None
                             ),
+                            audit_path=_degenerate_audit_path(ROOT, dataset, model, seed, output_ir),
                         )
 
                         comb_path = _metrics_combination_path(ROOT, dataset, model, seed, output_ir)
                         save_combination_csv(rows, comb_path)
                         append_to_master(rows, master_path)
+
+                        deg_path = _degenerate_audit_path(ROOT, dataset, model, seed, output_ir)
+                        real_feat_tmp  = real_train.drop(columns=[target], errors="ignore")
+                        synth_feat_tmp = synth_final.drop(columns=[target], errors="ignore")
+                        vc_audit = get_valid_columns_for_statistical_metrics(real_feat_tmp, synth_feat_tmp)
+                        audit_rows = build_degenerate_audit_rows(vc_audit, dataset, model, seed, output_ir)
+                        save_degenerate_audit(audit_rows, deg_path)
 
                         combo_elapsed = (datetime.now() - t0_combo).total_seconds()
                         logger.info(
