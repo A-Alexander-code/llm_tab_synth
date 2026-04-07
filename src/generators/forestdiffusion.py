@@ -27,12 +27,18 @@ class ForestDiffusionGenerator(BaseGenerator):
 
         feature_cols = [c for c in df.columns if c != "__target__"]
         X = df[feature_cols + ["__target__"]].values.astype(np.float32)
-
+        
+        xgb_params = {
+            'tree_method': 'hist', 
+            'device': 'cpu'       
+        }
+        
         model = ForestDiffusionModel(
             X,
             n_t=self.params["n_t"],
             duplicate_K=self.params["duplicate_K"],
             n_jobs=self.params["n_jobs"],
+            **xgb_params
         )
 
         with model_dir.joinpath("forestdiffusion_model.pkl").open("wb") as f:
