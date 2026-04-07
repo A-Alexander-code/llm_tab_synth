@@ -14,7 +14,6 @@ import pandas as pd
 import torch
 
 from src.generators.base import BaseGenerator
-from tabula.tabula import Tabula
 
 _TABULA_REPO = "https://github.com/zhao-zilong/Tabula"
 _TABULA_DIR  = Path(__file__).resolve().parent.parent.joinpath("models").joinpath("tabula")
@@ -60,6 +59,7 @@ def _save_tabula(model, model_dir: Path) -> None:
 def _load_tabula(model_dir: Path, llm: str):
     """Load a TabuLa model from its saved config and weights."""
     _ensure_tabula()
+    from tabula.tabula import Tabula  
 
     config_path = model_dir.joinpath("config.json")
     model_pt    = model_dir.joinpath("model.pt")
@@ -92,6 +92,7 @@ class TabulaGenerator(BaseGenerator):
     def fit(self, df: pd.DataFrame, model_dir: Path) -> None:
         os.environ["CUDA_VISIBLE_DEVICES"] = self.params.get("cuda_device", "0")
         _ensure_tabula()
+        from tabula.tabula import Tabula
 
         if model_dir.exists():
             shutil.rmtree(model_dir)
@@ -109,6 +110,7 @@ class TabulaGenerator(BaseGenerator):
         cuda_device = self.params.get("cuda_device", "0")
         os.environ["CUDA_VISIBLE_DEVICES"] = cuda_device
 
+        import torch
         if torch.cuda.is_available():
             device = f"cuda:{cuda_device}" if cuda_device.isdigit() else "cuda"
         else:
