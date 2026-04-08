@@ -3,7 +3,7 @@
     "datasets": [
       "T1D_child",
       "heart_framingham",
-      "breast_cancer",
+      "cervical_cancer",
       "diabetic_retinopathy",
       "diabetes_prima_indian",
       "kidney_disease"
