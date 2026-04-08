@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 
 from src.generators.base import BaseGenerator
-from tabpfgen import TabPFGen  # noqa: PLC0415
+from tabpfgen import TabPFGen  
 
 
 class TabpfgenGenerator(BaseGenerator):
