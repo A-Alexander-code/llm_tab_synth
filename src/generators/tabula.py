@@ -84,15 +84,40 @@ def _load_tabula(model_dir: Path, llm: str):
     state_dict = torch.load(buffer, map_location="cpu", weights_only=True)
     model.model.load_state_dict(state_dict)
 
+    model.model.config.pad_token_id = model.tokenizer.eos_token_id
+
     return model
+
+
+def _compute_max_length(df: pd.DataFrame, margin: int = 20) -> int:
+    """Estimate a suitable max_length from a sample of dataset rows."""
+    _ensure_tabula()
+    from tabula.tabula import Tabula  
+
+    tokenizer = Tabula(llm="distilgpt2").tokenizer
+    sample    = df.head(min(10, len(df)))
+    lengths   = []
+
+    for _, row in sample.iterrows():
+        text   = ", ".join(f"{col} is {val}" for col, val in row.items())
+        tokens = tokenizer(text, return_tensors="pt")
+        lengths.append(tokens["input_ids"].shape[1])
+
+    estimated = max(lengths) + margin
+    return max(80, min(estimated, 300))
 
 
 class TabulaGenerator(BaseGenerator):
 
     def fit(self, df: pd.DataFrame, model_dir: Path) -> None:
+        import warnings  
+        warnings.filterwarnings("ignore", message=".*kernel version.*")
+        warnings.filterwarnings("ignore", message=".*GPT2TokenizerFast.*")
+        warnings.filterwarnings("ignore", message=".*loss_type=None.*")
+
         os.environ["CUDA_VISIBLE_DEVICES"] = self.params.get("cuda_device", "0")
         _ensure_tabula()
-        from tabula.tabula import Tabula
+        from tabula.tabula import Tabula  
 
         if model_dir.exists():
             shutil.rmtree(model_dir)
@@ -106,21 +131,41 @@ class TabulaGenerator(BaseGenerator):
         model.fit(df)
         _save_tabula(model, model_dir)
 
+        estimated_max_length = _compute_max_length(df)
+        with model_dir.joinpath("sampling_config.json").open("w") as f:
+            json.dump({"estimated_max_length": estimated_max_length}, f)
+
     def sample(self, n_samples: int, model_dir: Path) -> pd.DataFrame:
+        import warnings  
+        warnings.filterwarnings("ignore", message=".*attention mask.*")
+        warnings.filterwarnings("ignore", message=".*kernel version.*")
+        warnings.filterwarnings("ignore", message=".*GPT2TokenizerFast.*")
+
         cuda_device = self.params.get("cuda_device", "0")
         os.environ["CUDA_VISIBLE_DEVICES"] = cuda_device
 
-        import torch
+        import torch  
         if torch.cuda.is_available():
             device = f"cuda:{cuda_device}" if cuda_device.isdigit() else "cuda"
         else:
             device = "cpu"
 
+        sampling_config_path = model_dir.joinpath("sampling_config.json")
+        if sampling_config_path.exists():
+            with sampling_config_path.open("r") as f:
+                sampling_config = json.load(f)
+            max_length = sampling_config.get(
+                "estimated_max_length",
+                self.params.get("max_length_sample", 200)
+            )
+        else:
+            max_length = self.params.get("max_length_sample", 200)
+
         model = _load_tabula(model_dir, llm=self.params["llm"])
         return model.sample(
             n_samples,
             device=device,
-            max_length=self.params.get("max_length_sample", 200),
+            max_length=max_length,
             temperature=self.params.get("temperature", 0.7),
             k=self.params.get("top_k", 100),
         )

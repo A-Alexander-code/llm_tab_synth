@@ -41,7 +41,7 @@
       "batch_size": 32,
       "epochs": 50,
       "cuda_device": "0",
-      "max_length_sample": 200,
+      "max_length_sample": 120,
       "temperature": 0.7,
       "top_k": 100
     },
