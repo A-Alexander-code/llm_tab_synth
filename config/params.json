@@ -41,9 +41,11 @@
       "batch_size": 32,
       "epochs": 50,
       "cuda_device": "0",
-      "max_length_sample": 120,
+      "max_length_sample": 80,
       "temperature": 0.7,
-      "top_k": 100
+      "top_k": 50,
+      "sample_batch_size": 10
+
     },
     "realtabformer": {
       "model_type": "tabular",
