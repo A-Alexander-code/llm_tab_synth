@@ -45,7 +45,8 @@
       "temperature": 0.7,
       "top_k": 50,
       "sample_batch_size": 1,
-      "force_fixed_max_length": true
+      "force_fixed_max_length": true,
+      "partition_max_columns": 10
 
     },
     "realtabformer": {
