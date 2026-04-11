@@ -9,6 +9,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -121,9 +122,17 @@ def _sample_in_batches(
     """Generate samples in smaller batches and log progress after each batch."""
     batches: list[pd.DataFrame] = []
     generated = 0
+    batch_idx = 0
 
     while generated < n_samples:
+        batch_idx += 1
         current_batch_size = min(batch_size, n_samples - generated)
+        batch_start = time.perf_counter()
+        _LOGGER.warning(
+            "[tabula] Starting batch %d with %d requested rows",
+            batch_idx,
+            current_batch_size,
+        )
         batch_df = model.sample(
             current_batch_size,
             device=device,
@@ -131,10 +140,13 @@ def _sample_in_batches(
             temperature=temperature,
             k=top_k,
         )
+        batch_elapsed = time.perf_counter() - batch_start
         batches.append(batch_df)
         generated += len(batch_df)
-        _LOGGER.info(
-            "[tabula] Sampling progress: %d/%d rows generated",
+        _LOGGER.warning(
+            "[tabula] Finished batch %d in %.2fs; progress=%d/%d rows",
+            batch_idx,
+            batch_elapsed,
             generated,
             n_samples,
         )
@@ -197,10 +209,7 @@ class TabulaGenerator(BaseGenerator):
         if sampling_config_path.exists():
             with sampling_config_path.open("r") as f:
                 sampling_config = json.load(f)
-            max_length = sampling_config.get(
-                "estimated_max_length",
-                self.params.get("max_length_sample", 200)
-            )
+            max_length = sampling_config.get("estimated_max_length", self.params.get("max_length_sample", 200))
         else:
             max_length = self.params.get("max_length_sample", 200)
 
@@ -208,16 +217,24 @@ class TabulaGenerator(BaseGenerator):
         sample_batch_size = max(1, min(sample_batch_size, n_samples))
         temperature = self.params.get("temperature", 0.7)
         top_k = self.params.get("top_k", 100)
+        force_fixed_max_length = bool(self.params.get("force_fixed_max_length", False))
 
-        _LOGGER.info(
-            "[tabula] Sampling with device=%s, n_samples=%d, batch_size=%d, max_length=%d",
+        if force_fixed_max_length:
+            max_length = int(self.params.get("max_length_sample", max_length))
+
+        _LOGGER.warning(
+            "[tabula] Sampling with device=%s, n_samples=%d, batch_size=%d, max_length=%d, force_fixed_max_length=%s",
             device,
             n_samples,
             sample_batch_size,
             max_length,
+            force_fixed_max_length,
         )
 
+        load_start = time.perf_counter()
         model = _load_tabula(model_dir, llm=self.params["llm"])
+        load_elapsed = time.perf_counter() - load_start
+        _LOGGER.warning("[tabula] Model loaded in %.2fs", load_elapsed)
         return _sample_in_batches(
             model=model,
             n_samples=n_samples,
