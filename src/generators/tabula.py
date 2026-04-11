@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import json
+import logging
 import os
 import shutil
 import subprocess
@@ -17,6 +18,7 @@ from src.generators.base import BaseGenerator
 
 _TABULA_REPO = "https://github.com/zhao-zilong/Tabula"
 _TABULA_DIR  = Path(__file__).resolve().parent.parent.joinpath("models").joinpath("tabula")
+_LOGGER = logging.getLogger(__name__)
 
 
 def _ensure_tabula():
@@ -107,6 +109,42 @@ def _compute_max_length(df: pd.DataFrame, margin: int = 20) -> int:
     return max(80, min(estimated, 300))
 
 
+def _sample_in_batches(
+    model,
+    n_samples: int,
+    batch_size: int,
+    device: str,
+    max_length: int,
+    temperature: float,
+    top_k: int,
+) -> pd.DataFrame:
+    """Generate samples in smaller batches and log progress after each batch."""
+    batches: list[pd.DataFrame] = []
+    generated = 0
+
+    while generated < n_samples:
+        current_batch_size = min(batch_size, n_samples - generated)
+        batch_df = model.sample(
+            current_batch_size,
+            device=device,
+            max_length=max_length,
+            temperature=temperature,
+            k=top_k,
+        )
+        batches.append(batch_df)
+        generated += len(batch_df)
+        _LOGGER.info(
+            "[tabula] Sampling progress: %d/%d rows generated",
+            generated,
+            n_samples,
+        )
+
+    if not batches:
+        return pd.DataFrame()
+
+    return pd.concat(batches, ignore_index=True).iloc[:n_samples].reset_index(drop=True)
+
+
 class TabulaGenerator(BaseGenerator):
 
     def fit(self, df: pd.DataFrame, model_dir: Path) -> None:
@@ -132,6 +170,11 @@ class TabulaGenerator(BaseGenerator):
         _save_tabula(model, model_dir)
 
         estimated_max_length = _compute_max_length(df)
+        _LOGGER.info(
+            "[tabula] Estimated max_length=%d for model_dir=%s",
+            estimated_max_length,
+            model_dir,
+        )
         with model_dir.joinpath("sampling_config.json").open("w") as f:
             json.dump({"estimated_max_length": estimated_max_length}, f)
 
@@ -161,11 +204,26 @@ class TabulaGenerator(BaseGenerator):
         else:
             max_length = self.params.get("max_length_sample", 200)
 
-        model = _load_tabula(model_dir, llm=self.params["llm"])
-        return model.sample(
+        sample_batch_size = int(self.params.get("sample_batch_size", 100))
+        sample_batch_size = max(1, min(sample_batch_size, n_samples))
+        temperature = self.params.get("temperature", 0.7)
+        top_k = self.params.get("top_k", 100)
+
+        _LOGGER.info(
+            "[tabula] Sampling with device=%s, n_samples=%d, batch_size=%d, max_length=%d",
+            device,
             n_samples,
+            sample_batch_size,
+            max_length,
+        )
+
+        model = _load_tabula(model_dir, llm=self.params["llm"])
+        return _sample_in_batches(
+            model=model,
+            n_samples=n_samples,
+            batch_size=sample_batch_size,
             device=device,
             max_length=max_length,
-            temperature=self.params.get("temperature", 0.7),
-            k=self.params.get("top_k", 100),
+            temperature=temperature,
+            top_k=top_k,
         )
