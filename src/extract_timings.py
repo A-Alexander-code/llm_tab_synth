@@ -5,7 +5,12 @@ from pathlib import Path
 def consolidate_timings_strict(base_path: str | Path = Path("results").joinpath("samples")):
     config = {
         "datasets": [
-            "heart_framingham"
+            "T1D_child",
+            "heart_framingham",
+            "cervical_cancer",
+            "diabetic_retinopathy",
+            "diabetes_prima_indian",
+            "kidney_disease"
             ],
         "models": [
             "great", "tabula", "realtabformer", "ctgan", "tvae", 
