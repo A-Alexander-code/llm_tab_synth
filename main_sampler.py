@@ -43,17 +43,9 @@ from src.io_utils import load_params, save_dataframe, save_json
 from src.logging_utils import setup_logging
 from src.model_registry import is_model_trained, register_trained_model
 from src.timing import Timer, save_timing
-from src.io_utils import load_dataset
-
-import warnings
-warnings.filterwarnings(
-    "ignore",
-    message=".*GPT2TokenizerFast.*",
-    category=UserWarning,
-)
-warnings.filterwarnings("ignore", category=UserWarning, module="transformers")
-
-
+from src.postprocessing import load_type_spec, postprocess_synthetic, postprocess_summary
+ 
+ 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Generate synthetic samples using multiple generative models.",
@@ -97,12 +89,11 @@ def resolve_combinations(
     params: dict,
     args: argparse.Namespace,
 ) -> tuple[list[str], list[str], list[int]]:
-    """Resuelve los conjuntos finales de modelos, datasets y seeds."""
+    """Resolve the final model, dataset, and seed lists."""
     models = args.models   or params["experiment"]["models"]
     datasets = args.datasets or params["experiment"]["datasets"]
     seeds = args.seeds    or params["experiment"]["seeds"]
  
-    # Validar modelos
     invalid = [m for m in models if m not in SUPPORTED_MODELS]
     if invalid:
         raise ValueError(f"Unsupported models: {invalid}. Valid: {SUPPORTED_MODELS}")
@@ -116,6 +107,7 @@ def build_train_df_for_class(
     label: int,
     meta: dict,
 ) -> pd.DataFrame:
+    """Rebuild the class-specific training DataFrame."""
     mask = y_train == label
     X_class = X_train[mask]
     y_class = y_train[mask]
@@ -128,6 +120,7 @@ def build_full_train_df(
     y_train: np.ndarray,
     meta: dict,
 ) -> pd.DataFrame:
+    """Rebuild the full training DataFrame with the target renamed to '__target__'."""
     df = reconstruct_dataframe(X_train, y_train, meta)
     target_col = meta["dataset"]["target_column"]
     return df.rename(columns={target_col: "__target__"})
@@ -135,19 +128,18 @@ def build_full_train_df(
  
 _FULL_DATASET_MODELS = {"tabpfgen", "forestdiffusion"}
  
- 
 def run(args: argparse.Namespace) -> None:
     params   = load_params(args.config)
     models, datasets, seeds = resolve_combinations(params, args)
  
-    n_samples   = params["experiment"]["n_samples_per_class"]
-    test_size   = params["experiment"]["test_split"]
-    target_col  = params["experiment"]["target_column"]
-    labels      = [0, 1]
+    n_samples = params["experiment"]["n_samples_per_class"]
+    test_size = params["experiment"]["test_split"]
+    target_col = params["experiment"]["target_column"]
+    labels = [0, 1]
  
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_file = LOGS_DIR.joinpath(f"sampler_{ts}.log")
-    logger   = setup_logging(LOGGING_CONFIG, log_file, logger_name="sampler")
+    logger = setup_logging(LOGGING_CONFIG, log_file, logger_name="sampler")
  
     logger.info("=" * 60)
     logger.info("main_sampler started at %s", ts)
@@ -178,8 +170,16 @@ def run(args: argparse.Namespace) -> None:
             logger.error("Dataset not found: %s", raw_path)
             continue
  
+        from src.io_utils import load_dataset
         df_raw = load_dataset(raw_path)
         logger.info("Loaded dataset '%s': %d rows, %d cols", dataset, *df_raw.shape)
+ 
+        description_path = ROOT_DIR.joinpath("config").joinpath("datasets_description.json")
+        type_spec = load_type_spec(dataset, description_path, raw_path)
+        logger.info(
+            "[%s] Type spec loaded: %s",
+            dataset, postprocess_summary(type_spec)
+        )
  
         for seed in seeds:
             processed_dir = get_processed_dir(dataset, seed)
@@ -212,8 +212,8 @@ def run(args: argparse.Namespace) -> None:
             X_train, X_test, y_train, y_test, meta = load_split(processed_dir)
  
             for model_name in models:
-                model_params  = params["model_params"][model_name]
-                uses_full_df  = model_name in _FULL_DATASET_MODELS
+                model_params = params["model_params"][model_name]
+                uses_full_df = model_name in _FULL_DATASET_MODELS
  
                 logger.info(
                     "[%s | seed=%d | %s] Starting...",
@@ -230,8 +230,8 @@ def run(args: argparse.Namespace) -> None:
  
                 if uses_full_df:
                     class_dir = get_model_class_dir(model_name, dataset, seed, label=0)
-                    class_dir = class_dir.parent  # usa seed_dir como model_dir
- 
+                    class_dir = class_dir.parent
+
                     already_trained = (
                         not args.force_retrain
                         and is_model_trained(class_dir, exp_hash)
@@ -282,6 +282,7 @@ def run(args: argparse.Namespace) -> None:
                             dataset=dataset,
                             seed=seed,
                             logger=logger,
+                            type_spec=type_spec,
                         )
  
                 else:
@@ -338,6 +339,7 @@ def run(args: argparse.Namespace) -> None:
                             dataset=dataset,
                             seed=seed,
                             logger=logger,
+                            type_spec=type_spec,
                         )
  
                 snapshot_path = samples_dir.joinpath(PARAMS_SNAPSHOT_NAME)
@@ -371,7 +373,9 @@ def _generate_and_save(
     dataset: str,
     seed: int,
     logger: logging.Logger,
+    type_spec=None,
 ) -> None:
+    """Generate class samples, optionally postprocess them, and save them."""
     logger.info(
         "[%s | seed=%d | %s | class=%d] Generating %d samples...",
         dataset, seed, model_name, label, n_samples,
@@ -383,6 +387,9 @@ def _generate_and_save(
         synth_df = synth_df[synth_df["__label__"] == label].drop(
             columns=["__label__"]
         ).reset_index(drop=True)
+ 
+    if type_spec is not None:
+        synth_df = postprocess_synthetic(synth_df, type_spec)
  
     synth_df["class"] = label
     out_path = samples_dir.joinpath(f"synthetic_class_{label}.csv")
@@ -399,7 +406,7 @@ def _generate_and_save(
     )
  
  
-
 if __name__ == "__main__":
     args = parse_args()
     run(args)
+ 

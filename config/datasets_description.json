@@ -1,0 +1,37 @@
+{
+  "cervical_cancer": {
+    "numeric_int": ["Age", "Number_of_sexual_partners", "First_sexual_intercourse", "Num_of_pregnancies", "STDs_(number)", "STDs__Number_of_diagnosis"],
+    "numeric_float": ["Smokes_(years)", "Smokes_(packs/year)", "Hormonal_Contraceptives_(years)", "IUD_(years)"],
+    "binary": ["Smokes", "Hormonal_Contraceptives", "IUD", "STDs", "STDs_condylomatosis", "STDs_cervical_condylomatosis", "STDs_vaginal_condylomatosis", "STDs_vulvo-perineal_condylomatosis", "STDs_syphilis", "STDs_pelvic_inflammatory_disease", "STDs_genital_herpes", "STDs_molluscum_contagiosum", "STDs_AIDS", "STDs_HIV", "STDs_Hepatitis_B", "STDs_HPV", "Dx_Cancer", "Dx_CIN", "Dx_HPV", "Dx", "Hinselmann", "Schiller", "Citology"],
+    "target": "class"
+  },
+  "diabetes_prima_indian": {
+    "numeric_int": ["pregnancies", "age"],
+    "numeric_float": ["glucose", "bloodpressure", "skinthickness", "insulin", "bmi", "diabetespedigreefunction"],
+    "target": "class"
+  },
+  "diabetic_retinopathy": {
+    "numeric_int": ["ma1", "ma2", "ma3", "ma4", "ma5", "ma6"],
+    "numeric_float": ["exudate1", "exudate2", "exudate3", "exudate5", "exudate6", "exudate7", "exudate8", "macula_opticdisc_distance", "opticdisc_diameter"],
+    "binary": ["quality", "pre_screening", "am_fm_classification"],
+    "target": "class"
+  },
+  "heart_framingham": {
+    "numeric_int": ["age"],
+    "numeric_float": ["cigsPerDay", "totChol", "sysBP", "diaBP", "BMI", "heartRate", "glucose"],
+    "categorical": ["education"],
+    "binary": ["sex", "currentSmoker", "BPMeds", "prevalentStroke", "prevalentHyp", "diabetes"],
+    "target": "class"
+  },
+  "kidney_disease": {
+    "numeric_int": ["age", "bp", "al", "su", "wbcc"],
+    "numeric_float": ["sg", "bgr", "bu", "sc", "sod", "pot", "hemo", "pcv", "rbcc"],
+    "binary": ["rbc", "pc", "pcc", "ba", "htn", "dm", "cad", "appet", "pe", "ane"],
+    "target": "class"
+  },
+  "T1D_child": {
+    "numeric_float": ["Age", "BloodPressure", "BMI", "HbA1c", "HypertensionCheck", "HeartCheck", "Pancreatic", "GADA", "IAA", "IA-2A", "ZnT8A", "MentalHealth", "PhysicalHealth"],
+    "binary": ["MedicalHistory", "Father_T1D", "Mother_T2D", "Fruits", "Vegetables", "PackagedDrinks", "Insurance", "MobilityDifficulty", "gender_M", "gender_F", "HealthLevel_Buruk", "HealthLevel_Excellent", "HealthLevel_Fair", "HealthLevel_Good", "HealthLevel_Very Good"],
+    "target": "class"
+  }
+}
