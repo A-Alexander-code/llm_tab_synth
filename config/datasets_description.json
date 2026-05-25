@@ -33,5 +33,12 @@
     "numeric_float": ["Age", "BloodPressure", "BMI", "HbA1c", "HypertensionCheck", "HeartCheck", "Pancreatic", "GADA", "IAA", "IA-2A", "ZnT8A", "MentalHealth", "PhysicalHealth"],
     "binary": ["MedicalHistory", "Father_T1D", "Mother_T2D", "Fruits", "Vegetables", "PackagedDrinks", "Insurance", "MobilityDifficulty", "gender_M", "gender_F", "HealthLevel_Buruk", "HealthLevel_Excellent", "HealthLevel_Fair", "HealthLevel_Good", "HealthLevel_Very Good"],
     "target": "class"
+  },
+  "df_static_101_tabular": {
+    "numeric_int": ["Age", "SAPSIIIScore","Admissiondboid"],
+    "numeric_float": ["delta_time"],
+    "categorical": ["Origin","Destination", "ReasonAdmission","PatientCategory"],
+    "binary": ["Gender"],
+  "target": "class"
   }
 }

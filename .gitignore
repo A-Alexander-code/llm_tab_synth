@@ -9,6 +9,7 @@ src/deeprecated
 testing_stuff.ipynb
 /results
 /figures
+src/__pycache__
 
 # Agents and skills configurations
 AGENTS.md

@@ -6,7 +6,8 @@
       "cervical_cancer",
       "diabetic_retinopathy",
       "diabetes_prima_indian",
-      "kidney_disease"
+      "kidney_disease",
+      "df_static_101_tabular"
     ],
     "models": [
       "great",
