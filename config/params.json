@@ -21,7 +21,7 @@
       "forestdiffusion",
       "mostlyai"
     ],
-    "seeds": [13, 23, 42, 69, 88],
+    "seeds": [42, 69, 88],
     "imbalance_ratios": [0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
     "n_samples_per_class": 700,
     "target_column": "class",
