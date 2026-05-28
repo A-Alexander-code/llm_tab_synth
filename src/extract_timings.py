@@ -25,6 +25,7 @@ def consolidate_timings_complete(
             "diabetic_retinopathy",
             "diabetes_prima_indian",
             "kidney_disease",
+            "df_static_101_tabular"
         ],
         "models": [
             "great", "tabula", "realtabformer", "ctgan", "tvae",
