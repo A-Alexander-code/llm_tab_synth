@@ -127,6 +127,7 @@
       "cuda_device": "cpu"
     }
   },
+<<<<<<< HEAD
   "plots": {
     "datasets": [
       "heart_framingham",
@@ -156,5 +157,63 @@
     "default_output_ir": 1.0,
     "default_title": false,
     "png_dpi": 300
+=======
+  "extended_evaluation": {
+    "enabled": true,
+    "default_metrics": [
+      "record_similarity",
+      "semantic_similarity",
+      "ngram_overlap",
+      "memorization",
+      "cooccurrence",
+      "tradeoff"
+    ],
+    "llm_only_default": false,
+    "output_dir": "results/metrics_extended_raw",
+    "master_path": "results/metrics_extended_master.csv",
+    "aggregated_path": "results/metrics_extended_aggregated.csv",
+    "skip_existing": true,
+    "append": true,
+    "workers": 1,
+    "tradeoff": {
+      "normalization": "fixed_ranges",
+      "utility_weight": 0.5,
+      "privacy_weight": 0.5,
+      "clip_scores": true
+    },
+    "llm_privacy": {
+      "record_similarity": {
+        "enabled": true,
+        "decimals": 6,
+        "thresholds": [0.9, 0.95, 0.99]
+      },
+      "semantic_similarity": {
+        "enabled": true,
+        "numeric_strategy": "quantile_bin",
+        "n_bins": 10,
+        "thresholds": [0.9, 0.95, 0.99]
+      },
+      "ngram_overlap": {
+        "enabled": true,
+        "n_values": [2, 3],
+        "numeric_strategy": "quantile_bin",
+        "n_bins": 10,
+        "rare_max_count": 2
+      },
+      "memorization_score": {
+        "enabled": true
+      }
+    },
+    "cooccurrence": {
+      "enabled": true,
+      "numeric_strategy": "quantile",
+      "n_bins": 4,
+      "top_k": 10
+    },
+    "temperature": {
+      "enabled": false,
+      "temperatures": [0.2, 0.7, 1.0, 1.3]
+    }
+>>>>>>> 73788fe... implemented extended_evaluator first draft
   }
 }

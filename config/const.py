@@ -58,6 +58,132 @@ SUPPORTED_MODELS = [
 
 DEFAULT_TARGET_COLUMN = "class"
 
+LLM_ONLY_MODELS = [
+    "great",
+    "tabula",
+    "realtabformer",
+]
+
+METRIC_REGISTRY = {
+    "record_similarity": {
+        "block": "privacy_record_similarity",
+        "requires_base_metrics": False,
+        "requires_temperature": False,
+    },
+    "semantic_similarity": {
+        "block": "privacy_semantic_similarity",
+        "requires_base_metrics": False,
+        "requires_temperature": False,
+    },
+    "ngram_overlap": {
+        "block": "privacy_ngram_overlap",
+        "requires_base_metrics": False,
+        "requires_temperature": False,
+    },
+    "memorization": {
+        "block": "privacy_memorization_proxy",
+        "requires_base_metrics": False,
+        "requires_temperature": False,
+    },
+    "cooccurrence": {
+        "block": "utility_cooccurrence",
+        "requires_base_metrics": False,
+        "requires_temperature": False,
+    },
+    "tradeoff": {
+        "block": "privacy_utility_tradeoff",
+        "requires_base_metrics": True,
+        "requires_temperature": False,
+    },
+    "temperature": {
+        "block": "privacy_temperature_sensitivity",
+        "requires_base_metrics": True,
+        "requires_temperature": True,
+    },
+}
+
+METRIC_ALIASES = {
+    "llm_privacy": [
+        "record_similarity",
+        "semantic_similarity",
+        "ngram_overlap",
+        "memorization",
+    ],
+    "all": [
+        "record_similarity",
+        "semantic_similarity",
+        "ngram_overlap",
+        "memorization",
+        "cooccurrence",
+        "tradeoff",
+    ],
+}
+
+EXPECTED_METRICS = {
+    "record_similarity": [
+        "record_sim_max_mean",
+        "record_sim_max_median",
+        "record_sim_max_p95",
+        "record_sim_max_p99",
+        "record_sim_high_ratio_090",
+        "record_sim_high_ratio_095",
+        "record_sim_high_ratio_099",
+        "record_sim_exactish_ratio",
+    ],
+    "semantic_similarity": [
+        "semantic_sim_max_mean",
+        "semantic_sim_max_median",
+        "semantic_sim_max_p95",
+        "semantic_sim_max_p99",
+        "semantic_sim_high_ratio_090",
+        "semantic_sim_high_ratio_095",
+        "semantic_sim_high_ratio_099",
+    ],
+    "ngram_overlap": [
+        "ngram2_overlap_mean",
+        "ngram2_overlap_median",
+        "ngram2_overlap_p95",
+        "ngram2_train_vocab_reuse_ratio",
+        "ngram2_synthetic_vocab_seen_ratio",
+        "ngram2_rare_reuse_ratio",
+        "ngram2_rare_reuse_per_record_mean",
+        "ngram3_overlap_mean",
+        "ngram3_overlap_median",
+        "ngram3_overlap_p95",
+        "ngram3_train_vocab_reuse_ratio",
+        "ngram3_synthetic_vocab_seen_ratio",
+        "ngram3_rare_reuse_ratio",
+        "ngram3_rare_reuse_per_record_mean",
+    ],
+    "memorization": [
+        "memrisk_output_score",
+        "memrisk_components_available",
+    ],
+    "cooccurrence": [
+        "cooc_l1_mean",
+        "cooc_jsd_mean",
+        "cooc_l2_frobenius_normed",
+        "cooc_max_abs_diff",
+        "cooc_top10_pair_overlap",
+        "cooc_spearman_pairwise_strength",
+    ],
+    "tradeoff": [
+        "tradeoff_utility_score",
+        "tradeoff_privacy_score",
+        "tradeoff_balance_score",
+        "tradeoff_min_score",
+    ],
+}
+
+TEMPERATURE_TRACKING = {
+    "record_similarity": ["record_sim_high_ratio_095"],
+    "semantic_similarity": ["semantic_sim_high_ratio_095"],
+    "ngram_overlap": ["ngram2_rare_reuse_ratio", "ngram3_rare_reuse_ratio"],
+    "memorization": ["memrisk_output_score"],
+    "cooccurrence": ["cooc_jsd_mean"],
+    "tradeoff": ["tradeoff_balance_score"],
+}
+
 
 def get_processed_dir(dataset: str, seed: int) -> Path:
     """Path to processed split: data/processed/{dataset}/seed_{seed}/"""
