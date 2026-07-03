@@ -51,6 +51,14 @@ def _safe_float(value: Any) -> float | None:
     return numeric
 
 
+def _normalize_classifier(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, (float, np.floating)) and not np.isfinite(value):
+        return None
+    return str(value)
+
+
 def _metric_map(metric_rows: list[dict[str, Any]]) -> dict[tuple[str, str | None], float]:
     metric_values: dict[tuple[str, str | None], float] = {}
     for row in metric_rows:
@@ -59,7 +67,7 @@ def _metric_map(metric_rows: list[dict[str, Any]]) -> dict[tuple[str, str | None
         value = _safe_float(row.get("value"))
         if value is None:
             continue
-        metric_values[(str(row.get("metric")), row.get("classifier"))] = value
+        metric_values[(str(row.get("metric")), _normalize_classifier(row.get("classifier")))] = value
     return metric_values
 
 
@@ -75,10 +83,12 @@ def _collect_utility_components(
     classifiers = {row_classifier for _, row_classifier in metric_values if row_classifier is not None}
 
     if classifier is not None:
-        classifiers = {classifier}
+        classifiers = {_normalize_classifier(classifier)}
 
     components: list[float] = []
     for row_classifier in sorted(classifiers):
+        if row_classifier is None:
+            continue
         for suffix in ratio_suffixes:
             trtr = metric_values.get((f"trtr_{suffix}", row_classifier))
             tstr = metric_values.get((f"tstr_{suffix}", row_classifier))
