@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import unittest
+from unittest.mock import patch
 
 import pandas as pd
 
@@ -95,6 +96,48 @@ class LlmPrivacyTests(unittest.TestCase):
         self.assertTrue(rows)
         self.assertTrue(all(row["status"] == "not_computable" for row in rows))
         self.assertEqual({row["reason"] for row in rows}, {"empty_input"})
+
+    def test_semantic_similarity_accepts_sparse_max_outputs(self) -> None:
+        real_train = _real_df()
+        synthetic = real_train.copy()
+
+        class FakeSparseMaxResult:
+            def toarray(self) -> list[list[float]]:
+                return [[0.9], [1.0], [0.95]]
+
+        class FakeSimilarityMatrix:
+            def max(self, axis: int) -> FakeSparseMaxResult:
+                self_axis = axis
+                if self_axis != 1:
+                    raise AssertionError("Expected row-wise max over axis=1")
+                return FakeSparseMaxResult()
+
+        class FakeTfidfMatrix:
+            @property
+            def T(self) -> "FakeTfidfMatrix":
+                return self
+
+            def __matmul__(self, other: object) -> FakeSimilarityMatrix:
+                del other
+                return FakeSimilarityMatrix()
+
+        class FakeVectorizer:
+            def __init__(self, *args: object, **kwargs: object) -> None:
+                del args, kwargs
+
+            def fit_transform(self, values: list[str]) -> FakeTfidfMatrix:
+                del values
+                return FakeTfidfMatrix()
+
+            def transform(self, values: list[str]) -> FakeTfidfMatrix:
+                del values
+                return FakeTfidfMatrix()
+
+        with patch("src.evaluation.llm_privacy.TfidfVectorizer", FakeVectorizer):
+            semantic_metrics = compute_semantic_similarity_metrics(real_train, synthetic)
+
+        self.assertAlmostEqual(semantic_metrics["semantic_sim_max_mean"], 0.95)
+        self.assertEqual(semantic_metrics["semantic_sim_high_ratio_095"], 2 / 3)
 
 
 if __name__ == "__main__":

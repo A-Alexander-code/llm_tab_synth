@@ -232,6 +232,22 @@ def _percentile(values: np.ndarray, q: float) -> float:
     return float(np.percentile(values, q)) if values.size else float("nan")
 
 
+def _as_flat_float_array(values: Any) -> np.ndarray:
+    """
+    Convert dense or sparse vector-like outputs into a 1D float ndarray.
+
+    Some scipy/sklearn sparse reductions return sparse matrix objects for
+    expressions like `matrix.max(axis=1)`, which `np.asarray(...)` may wrap as an
+    object array instead of densifying. Normalizing here keeps downstream
+    aggregations stable across library versions.
+    """
+    if hasattr(values, "toarray"):
+        dense_values = values.toarray()
+    else:
+        dense_values = values
+    return np.asarray(dense_values, dtype=float).reshape(-1)
+
+
 def _build_canonical_data(
     real_train: pd.DataFrame,
     synthetic: pd.DataFrame,
@@ -481,7 +497,7 @@ def compute_semantic_similarity_metrics(
     tfidf_synth = vectorizer.transform(synth_strings)
 
     similarity_matrix = tfidf_synth @ tfidf_real.T
-    max_scores = np.asarray(similarity_matrix.max(axis=1)).reshape(-1)
+    max_scores = _as_flat_float_array(similarity_matrix.max(axis=1))
 
     metrics: dict[str, float] = {
         "semantic_sim_max_mean": float(np.mean(max_scores)),
