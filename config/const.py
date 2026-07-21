@@ -23,6 +23,15 @@ RESULTS_SAMPLES_DIR = RESULTS_DIR.joinpath("samples")
 PARAMS_FILE = CONFIG_DIR.joinpath("params.json")
 LOGGING_CONFIG = CONFIG_DIR.joinpath("logging.yaml")
 
+METRICS_AGGREGATED_DIR = RESULTS_DIR.joinpath("metrics_aggregated")
+
+FIGURES_DIR = ROOT_DIR.joinpath("figures")
+EVALUATION_FIGURES_DIR = FIGURES_DIR.joinpath("evaluation_profiles")
+
+UTILITY_FIGURES_DIR = EVALUATION_FIGURES_DIR.joinpath("utility")
+PRIVACY_FIGURES_DIR = EVALUATION_FIGURES_DIR.joinpath("privacy")
+TRADEOFF_FIGURES_DIR = EVALUATION_FIGURES_DIR.joinpath("tradeoff")
+
 SYNTHETIC_FILENAME = "synthetic_class_{label}.csv"
 TIMING_FILENAME = "timing.json"
 MODEL_HASH_FILENAME = "model_hash.json"

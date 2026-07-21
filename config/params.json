@@ -21,8 +21,21 @@
       "forestdiffusion",
       "mostlyai"
     ],
-    "seeds": [13, 23, 42, 69, 88],
-    "imbalance_ratios": [0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
+    "seeds": [
+      13,
+      23,
+      42,
+      69,
+      88
+    ],
+    "imbalance_ratios": [
+      0.5,
+      0.6,
+      0.7,
+      0.8,
+      0.9,
+      1.0
+    ],
     "n_samples_per_class": 700,
     "target_column": "class",
     "test_split": 0.2
@@ -58,14 +71,26 @@
     "ctgan": {
       "epochs": 300,
       "batch_size": 500,
-      "generator_dim": [256, 256],
-      "discriminator_dim": [256, 256]
+      "generator_dim": [
+        256,
+        256
+      ],
+      "discriminator_dim": [
+        256,
+        256
+      ]
     },
     "tvae": {
       "epochs": 300,
       "batch_size": 500,
-      "compress_dims": [128, 128],
-      "decompress_dims": [128, 128],
+      "compress_dims": [
+        128,
+        128
+      ],
+      "decompress_dims": [
+        128,
+        128
+      ],
       "embedding_dim": 128
     },
     "gaussian_copula": {
@@ -74,8 +99,14 @@
     "copulagan": {
       "epochs": 300,
       "batch_size": 500,
-      "generator_dim": [256, 256],
-      "discriminator_dim": [256, 256],
+      "generator_dim": [
+        256,
+        256
+      ],
+      "discriminator_dim": [
+        256,
+        256
+      ],
       "default_distribution": "norm"
     },
     "tabpfgen": {
@@ -95,5 +126,35 @@
       "max_epochs": 100,
       "cuda_device": "cpu"
     }
+  },
+  "plots": {
+    "datasets": [
+      "heart_framingham",
+      "cervical_cancer",
+      "diabetic_retinopathy",
+      "diabetes_prima_indian",
+      "kidney_disease"
+    ],
+    "model_order": [
+      "great",
+      "tabula",
+      "realtabformer",
+      "ctgan",
+      "copulagan",
+      "tvae",
+      "gaussian_copula",
+      "forestdiffusion",
+      "tabpfgen",
+      "mostlyai"
+    ],
+    "default_classifier": "xgboost",
+    "supported_classifiers": [
+      "logistic_regression",
+      "random_forest",
+      "xgboost"
+    ],
+    "default_output_ir": 1.0,
+    "default_title": false,
+    "png_dpi": 300
   }
 }
