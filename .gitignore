@@ -12,20 +12,22 @@ testing_stuff.ipynb
 /figures
 /audits
 src/__pycache__
+/models
+evaluator.log
+/src/models
+/logs
+/src/generators/tabula.py.bak2
+/src/generators/tabula.py.bak3
 
 # Agents and skills configurations
 AGENTS.md
 /.agents
 /.vscode
 .codex
-<<<<<<< HEAD
 *.ipynb
-*.pyc
 *.csv
 *.json
-=======
 
 *.pyc
 config/__pycache__/const.cpython-312.pyc
->>>>>>> 73788fe... implemented extended_evaluator first draft
 __pycache__/
