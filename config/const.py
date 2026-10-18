@@ -15,6 +15,22 @@ SRC_DIR = ROOT_DIR.joinpath("src")
 
 DATA_RAW_DIR = DATA_DIR.joinpath("raw")
 DATA_PROCESSED_DIR = DATA_DIR.joinpath("processed")
+DATA_ORIGINAL_SOURCE_DIR = DATA_DIR.joinpath("original_source")
+DATA_REVISION_A1_DIR = DATA_DIR.joinpath("processed_revision_a1")
+REVISION_A1_SOURCE_FILES = {
+    "heart_framingham": DATA_ORIGINAL_SOURCE_DIR.joinpath("framingham.csv"),
+    "diabetes_prima_indian": DATA_ORIGINAL_SOURCE_DIR.joinpath("pima_indians_diabetes.csv"),
+    "diabetic_retinopathy": DATA_ORIGINAL_SOURCE_DIR.joinpath("Retinopathy_Diabetes.csv"),
+    "cervical_cancer": DATA_ORIGINAL_SOURCE_DIR.joinpath("risk_factors_cervical_cancer.csv"),
+}
+REVISION_A1_CODE_FILES = (
+    ROOT_DIR.joinpath("main_prepare_revision_a1.py"),
+    SRC_DIR.joinpath("revision_a1.py"),
+    SRC_DIR.joinpath("__init__.py"),
+    SRC_DIR.joinpath("logging_utils.py"),
+    ROOT_DIR.joinpath("tests", "test_revision_a1.py"),
+    CONFIG_DIR.joinpath("const.py"),
+)
 
 RESULTS_METRICS_DIR = RESULTS_DIR.joinpath("metrics")
 RESULTS_FIGURES_DIR = RESULTS_DIR.joinpath("figures")

@@ -33,6 +33,10 @@ samples are assembled for evaluation.
 
 ## Repository structure
 
+Revised A1 data preparation (four immutable original sources, group splits and
+train-only preprocessing) is documented in [docs/revision_a1.md](docs/revision_a1.md).
+It has a separate CLI/output tree and does not train models or overwrite prior runs.
+
 ```text
 config/
   const.py                    Project paths and supported model names
