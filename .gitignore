@@ -9,6 +9,7 @@ src/deeprecated
 testing_stuff.ipynb
 /results
 /figures
+/audits
 src/__pycache__
 
 # Agents and skills configurations
