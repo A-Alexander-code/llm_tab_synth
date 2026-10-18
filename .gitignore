@@ -18,3 +18,5 @@ AGENTS.md
 .codex
 *.ipynb
 *.pyc
+*.csv
+*.json
