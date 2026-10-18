@@ -11,7 +11,10 @@ testing_stuff.ipynb
 /figures
 /audits
 src/__pycache__
-
+/models
+/logs
+/src/generators
+evaluator.log
 # Agents and skills configurations
 AGENTS.md
 /.agents
