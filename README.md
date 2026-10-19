@@ -340,6 +340,12 @@ figures/evaluation_profiles/tradeoff/
 
 ## Reproducibility and caching
 
+The following caching behavior describes historical mode. The explicit
+`--revision-a1-run` mode consumes only the pinned, verified A1 preparation,
+uses separate model/result paths, and refuses model reuse or overwrites.
+See [A1 integration and no-training verification](docs/revision_a1_integration.md)
+for commands, evidence, limitations, and the ForestDiffusion execution block.
+
 - Each dataset/seed split is generated once with stratification and then reused.
 - Training IR is never modified; requested output IR values are applied during
   evaluation.

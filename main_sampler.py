@@ -82,6 +82,7 @@ def parse_args() -> argparse.Namespace:
         "--dry-run", action="store_true",
         help="Print the planned experiment combinations without executing.",
     )
+    parser.add_argument("--revision-a1-run", help="Explicit pinned A1 run ID; strict isolated data and outputs")
     return parser.parse_args()
  
  
@@ -129,6 +130,9 @@ def build_full_train_df(
 _FULL_DATASET_MODELS = {"tabpfgen", "forestdiffusion"}
  
 def run(args: argparse.Namespace) -> None:
+    if getattr(args, "revision_a1_run", None):
+        from src.revision_a1_runtime import run_sampler
+        return run_sampler(args)
     params   = load_params(args.config)
     models, datasets, seeds = resolve_combinations(params, args)
  

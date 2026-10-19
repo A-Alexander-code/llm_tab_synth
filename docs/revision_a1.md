@@ -81,8 +81,10 @@ reported separately, without changing the split retrospectively. Adversarial
 unit tests cover failure paths, fractional medians, mode ties, threshold equality,
 invalid headers, contradictory targets and artifact corruption.
 
-The existing sampler/evaluator are deliberately not connected to these outputs.
-All models and downstream metrics must later consume the same revised partitions.
-No generator/classifier is trained here. A1 is not closed: experimental reruns,
+The sampler/evaluator now have an explicit, isolated `--revision-a1-run` consumer.
+See [the integration report](revision_a1_integration.md) for the pinned run,
+no-training commands, input hashes, simulations, and ForestDiffusion block.
+The default historical mode keeps its previous behavior. No generator/classifier
+has been trained in this integration. A1 is not closed: experimental reruns,
 clinical target codebooks, subject-level independence (no IDs), and temporal
 availability of Cervical diagnostic predictors remain pending.

@@ -253,10 +253,12 @@ def _evaluate_combination(
     logger: logging.Logger,
     classifiers_dir: Path | None = None,
     audit_path: Path | None = None,
+    timed_block=None,
 ) -> list[dict]:
     """Run all evaluation blocks for one dataset/model/seed/IR combination."""
     prefix = f"[{dataset}|seed={seed}|{model}|ir={output_ir:.2f}]"
     all_rows = []
+    dispatch = timed_block or _timed_block
 
     real_train_feat = real_train.drop(columns=[target], errors="ignore")
     real_test_feat = real_test.drop(columns=[target],  errors="ignore")
@@ -277,30 +279,30 @@ def _evaluate_combination(
             audit_rows = build_degenerate_audit_rows(vcr, dataset, model, seed, output_ir)
             save_degenerate_audit(audit_rows, audit_path)
 
-    all_rows += _timed_block(
+    all_rows += dispatch(
         compute_degenerate_diagnostics, "degenerate_diagnostics",
         prefix, logger, synth_feat, real_train_feat, vcr,
     )
 
-    all_rows += _timed_block(compute_univariate, "univariate",           prefix, logger, real_train_feat, synth_feat)
-    all_rows += _timed_block(compute_multivariate, "multivariate",         prefix, logger, real_train_feat, synth_feat)
-    all_rows += _timed_block(compute_detectability, "detectability",        prefix, logger, real_train_feat, synth_feat, seed=seed)
-    all_rows += _timed_block(
+    all_rows += dispatch(compute_univariate, "univariate",           prefix, logger, real_train_feat, synth_feat)
+    all_rows += dispatch(compute_multivariate, "multivariate",         prefix, logger, real_train_feat, synth_feat)
+    all_rows += dispatch(compute_detectability, "detectability",        prefix, logger, real_train_feat, synth_feat, seed=seed)
+    all_rows += dispatch(
         compute_ml_efficacy, "ml_efficacy (TRTR+TSTR)", prefix, logger,
         real_train, real_test, synth_final,
         target=target, seed=seed, classifiers_dir=classifiers_dir,
     )
 
-    all_rows += _timed_block(compute_exact_matches,  "exact_matches",      prefix, logger, synth_feat, real_train_feat)
-    all_rows += _timed_block(compute_dcr,            "dcr",                prefix, logger, synth_feat, real_train_feat)
-    all_rows += _timed_block(compute_dcr_holdout,    "dcr_holdout",        prefix, logger, real_test_feat, real_train_feat)
-    all_rows += _timed_block(compute_mia,            "mia",                prefix, logger, synth_feat, real_train_feat, real_test_feat, seed=seed)
-    all_rows += _timed_block(
+    all_rows += dispatch(compute_exact_matches,  "exact_matches",      prefix, logger, synth_feat, real_train_feat)
+    all_rows += dispatch(compute_dcr,            "dcr",                prefix, logger, synth_feat, real_train_feat)
+    all_rows += dispatch(compute_dcr_holdout,    "dcr_holdout",        prefix, logger, real_test_feat, real_train_feat)
+    all_rows += dispatch(compute_mia,            "mia",                prefix, logger, synth_feat, real_train_feat, real_test_feat, seed=seed)
+    all_rows += dispatch(
         compute_attribute_inference, "attribute_inference", prefix, logger,
         synth_final, real_train, real_test, target=target, seed=seed,
     )
-    all_rows += _timed_block(compute_nnaa,       "nnaa",        prefix, logger, synth_feat, real_train_feat)
-    all_rows += _timed_block(compute_kanonymity, "k_anonymity", prefix, logger, synth_feat, real_train_feat, real_test_feat)
+    all_rows += dispatch(compute_nnaa,       "nnaa",        prefix, logger, synth_feat, real_train_feat)
+    all_rows += dispatch(compute_kanonymity, "k_anonymity", prefix, logger, synth_feat, real_train_feat, real_test_feat)
 
     return build_rows(all_rows, dataset=dataset, model=model, seed=seed, output_ir=output_ir)
 
@@ -309,9 +311,10 @@ def parse_args(config: dict) -> argparse.Namespace:
     exp = config["experiment"]
     parser = argparse.ArgumentParser(description="Synthetic tabular data evaluator")
     parser.add_argument("--config",   type=str, default=str(CONFIG_PATH))
-    parser.add_argument("--datasets", nargs="+", default=exp["datasets"])
-    parser.add_argument("--models",   nargs="+", default=exp["models"])
-    parser.add_argument("--seeds",    nargs="+", type=int, default=exp["seeds"])
+    parser.add_argument("--revision-a1-run", help="Explicit pinned A1 run ID; strict isolated data and outputs")
+    parser.add_argument("--datasets", nargs="+", default=None)
+    parser.add_argument("--models",   nargs="+", default=None)
+    parser.add_argument("--seeds",    nargs="+", type=int, default=None)
     parser.add_argument("--ir",       nargs="+", type=float, default=exp["imbalance_ratios"])
     parser.add_argument("--dry-run",  action="store_true")
     parser.add_argument(
@@ -327,14 +330,22 @@ def parse_args(config: dict) -> argparse.Namespace:
             "Default: false."
         ),
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+    if not args.revision_a1_run:
+        for name in ("datasets", "models", "seeds"):
+            if getattr(args, name) is None:
+                setattr(args, name, exp[name])
+    return args
 
 
 def run(args: argparse.Namespace, config: dict, logger: logging.Logger) -> None:
+    if getattr(args, "revision_a1_run", None):
+        from src.revision_a1_runtime import run_evaluator
+        return run_evaluator(args, config, logger, _evaluate_combination)
     target     = config["experiment"]["target_column"]
-    datasets   = args.datasets
-    models     = args.models
-    seeds      = args.seeds
+    datasets   = args.datasets if args.datasets is not None else config["experiment"]["datasets"]
+    models     = args.models if args.models is not None else config["experiment"]["models"]
+    seeds      = args.seeds if args.seeds is not None else config["experiment"]["seeds"]
     output_irs = sorted(args.ir)
 
     total_combinations = len(datasets) * len(seeds) * len(models) * len(output_irs)
@@ -523,6 +534,10 @@ def run(args: argparse.Namespace, config: dict, logger: logging.Logger) -> None:
 
 if __name__ == "__main__":
     config = _load_config(CONFIG_PATH)
-    logger = _setup_logging(ROOT.joinpath("logs"))
     args   = parse_args(config)
+    if args.revision_a1_run:
+        logging.basicConfig(level=logging.INFO, stream=sys.stdout)
+        logger = logging.getLogger("revision_a1_evaluator")
+    else:
+        logger = _setup_logging(ROOT.joinpath("logs"))
     run(args, config, logger)
