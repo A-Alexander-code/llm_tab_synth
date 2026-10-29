@@ -11,7 +11,7 @@ LOGGER = logging.getLogger("main_plotter")
 
 def build_parser(settings: PlotSettings) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Generate evaluation plots from aggregated metrics."
+        description="Reproduce the publication figures from plotting_results_ver4.ipynb."
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -54,7 +54,6 @@ def build_parser(settings: PlotSettings) -> argparse.ArgumentParser:
         help="Generate the privacy-utility tradeoff figure.",
     )
     _add_classifier_argument(tradeoff_parser, settings)
-    _add_output_ir_argument(tradeoff_parser, settings)
 
     all_parser = subparsers.add_parser(
         "all",
@@ -62,7 +61,12 @@ def build_parser(settings: PlotSettings) -> argparse.ArgumentParser:
         help="Generate all figures.",
     )
     _add_classifier_argument(all_parser, settings)
-    _add_output_ir_argument(all_parser, settings)
+
+    for command in ("detectability", "timing"):
+        subparsers.add_parser(
+            command, parents=[common_parser],
+            help=f"Generate {command} figures.",
+        )
 
     return parser
 
@@ -126,11 +130,6 @@ def main(argv: Optional[list[str]] = None) -> int:
             "classifier",
             settings.default_classifier,
         )
-        output_ir = getattr(
-            args,
-            "output_ir",
-            settings.default_output_ir,
-        )
 
         LOGGER.info("Starting command: %s", args.command)
         LOGGER.info("Selected datasets: %s", ", ".join(datasets))
@@ -139,7 +138,6 @@ def main(argv: Optional[list[str]] = None) -> int:
             settings=settings,
             datasets=datasets,
             classifier=classifier,
-            output_ir=output_ir,
             include_title=args.title,
             logger=LOGGER,
         )
@@ -159,31 +157,10 @@ def _add_classifier_argument(
 ) -> None:
     parser.add_argument(
         "--classifier",
-        choices=settings.supported_classifiers,
-        default=settings.default_classifier,
-        help="Classifier used for utility metrics.",
+        choices=("all", *settings.supported_classifiers),
+        default="all",
+        help="Classifier for utility and tradeoff; default: all three classifiers.",
     )
-
-
-def _add_output_ir_argument(
-    parser: argparse.ArgumentParser,
-    settings: PlotSettings,
-) -> None:
-    parser.add_argument(
-        "--output-ir",
-        type=_positive_float,
-        default=settings.default_output_ir,
-        help="Single output imbalance ratio used by the tradeoff plot.",
-    )
-
-
-def _positive_float(value: str) -> float:
-    parsed = float(value)
-
-    if parsed <= 0:
-        raise argparse.ArgumentTypeError("output IR must be greater than zero")
-
-    return parsed
 
 
 if __name__ == "__main__":

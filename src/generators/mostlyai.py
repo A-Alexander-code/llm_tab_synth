@@ -13,6 +13,10 @@ from src.generators.base import BaseGenerator
 class MostlyAIGenerator(BaseGenerator):
  
     def fit(self, df: pd.DataFrame, model_dir: Path) -> None:
+        from src.revision_generator_parameters import revised_context
+        revised = revised_context(self.params, "mostlyai")
+        # The installed API takes MINUTES. No conversion of the effective value.
+        training_minutes = self.params["max_training_time_minutes"] if revised else self.params["max_training_time"]
         os.environ["CUDA_VISIBLE_DEVICES"] = self.params.get("cuda_device", "0")
         from mostlyai.engine._tabular.interface import (  # noqa: PLC0415
             analyze, encode, split, train,
@@ -25,7 +29,7 @@ class MostlyAIGenerator(BaseGenerator):
         analyze(workspace_dir=workspace)
         encode(workspace_dir=workspace)
         train(
-            max_training_time=self.params["max_training_time"],
+            max_training_time=training_minutes,
             max_epochs=self.params["max_epochs"],
             device=self.params.get("cuda_device", "0"),
             workspace_dir=workspace,

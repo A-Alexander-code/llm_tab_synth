@@ -1,5 +1,10 @@
 # A1: integración controlada sin entrenamiento
 
+Este informe describe la entrega del 18/10/2026. La [continuación del
+19/10/2026](revision_followup.md) añade auditoría de bibliotecas, baselines,
+diagnósticos y registros de predicciones, sin entrenamiento ni cambios en
+ForestDiffusion. Sus cambios posteriores están documentados por separado.
+
 Rama inspeccionada: `revision/a1-data-preparation`, inicialmente sin cambios locales.
 No se encontraron `AGENTS.md` ni una skill local `dataset-pipeline` disponible;
 se aplicaron las restricciones explícitas del usuario. No se leyeron archivos de

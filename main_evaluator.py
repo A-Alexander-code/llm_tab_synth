@@ -254,6 +254,7 @@ def _evaluate_combination(
     classifiers_dir: Path | None = None,
     audit_path: Path | None = None,
     timed_block=None,
+    utility_block=None,
 ) -> list[dict]:
     """Run all evaluation blocks for one dataset/model/seed/IR combination."""
     prefix = f"[{dataset}|seed={seed}|{model}|ir={output_ir:.2f}]"
@@ -288,7 +289,7 @@ def _evaluate_combination(
     all_rows += dispatch(compute_multivariate, "multivariate",         prefix, logger, real_train_feat, synth_feat)
     all_rows += dispatch(compute_detectability, "detectability",        prefix, logger, real_train_feat, synth_feat, seed=seed)
     all_rows += dispatch(
-        compute_ml_efficacy, "ml_efficacy (TRTR+TSTR)", prefix, logger,
+        utility_block or compute_ml_efficacy, "ml_efficacy (TRTR+TSTR)", prefix, logger,
         real_train, real_test, synth_final,
         target=target, seed=seed, classifiers_dir=classifiers_dir,
     )
@@ -317,6 +318,8 @@ def parse_args(config: dict) -> argparse.Namespace:
     parser.add_argument("--seeds",    nargs="+", type=int, default=None)
     parser.add_argument("--ir",       nargs="+", type=float, default=exp["imbalance_ratios"])
     parser.add_argument("--dry-run",  action="store_true")
+    parser.add_argument("--evaluation-output", type=Path,
+                        help="New output directory for the matched-train evaluation protocol; never overwritten")
     parser.add_argument(
         "--save-classifiers",
         type=lambda x: x.lower() in ("true", "1", "yes"),
@@ -331,6 +334,10 @@ def parse_args(config: dict) -> argparse.Namespace:
         ),
     )
     args = parser.parse_args()
+    if args.revision_a1_run and "evaluation_protocol" in _load_config(Path(args.config)):
+        if "--ir" in sys.argv[1:]:
+            parser.error("The matched-train protocol uses fixed real class counts; --ir is not applicable")
+        args.ir = []
     if not args.revision_a1_run:
         for name in ("datasets", "models", "seeds"):
             if getattr(args, name) is None:
@@ -340,6 +347,10 @@ def parse_args(config: dict) -> argparse.Namespace:
 
 def run(args: argparse.Namespace, config: dict, logger: logging.Logger) -> None:
     if getattr(args, "revision_a1_run", None):
+        revised_config = _load_config(Path(args.config))
+        if "evaluation_protocol" in revised_config:
+            from src.evaluation.revised import run_evaluator
+            return run_evaluator(args, revised_config, logger)
         from src.revision_a1_runtime import run_evaluator
         return run_evaluator(args, config, logger, _evaluate_combination)
     target     = config["experiment"]["target_column"]
@@ -540,4 +551,6 @@ if __name__ == "__main__":
         logger = logging.getLogger("revision_a1_evaluator")
     else:
         logger = _setup_logging(ROOT.joinpath("logs"))
-    run(args, config, logger)
+    exit_code = run(args, config, logger)
+    if isinstance(exit_code, int):
+        sys.exit(exit_code)

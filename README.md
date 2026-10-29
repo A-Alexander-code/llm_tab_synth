@@ -1,5 +1,8 @@
 # Synthetic Tabular Data Generation Benchmark
 
+For the eight-generator final campaign and its reproducibility evidence, see the
+[R2.G11 central guide](docs/reproducibility_final_campaign.md). The general workflow below also covers historical experiments.
+
 This repository benchmarks generative models for **class-conditional synthetic
 tabular data generation**, with particular emphasis on imbalanced binary
 classification datasets. It provides an end-to-end workflow to:
@@ -28,7 +31,7 @@ samples are assembled for evaluation.
 | Gaussian Copula (`gaussian_copula`) | One model per class |
 | CopulaGAN (`copulagan`) | One model per class |
 | TabPFGen (`tabpfgen`) | One model trained on the full labelled dataset |
-| ForestDiffusion (`forestdiffusion`) | One model trained on the full labelled dataset |
+| ForestDiffusion (`forestdiffusion`) | Historical: full labelled dataset. Revised A1: two classwise models; real execution blocked pending validation |
 | MOSTLY AI (`mostlyai`) | One model per class |
 
 ## Repository structure
@@ -273,70 +276,57 @@ logs/evaluator_<timestamp>.log
 
 ### 3. Plotting: `main_plotter.py`
 
-The plotter reads `results/metrics_aggregated/<dataset>_aggregated.csv`. It
-requires one of four subcommands: `utility`, `privacy`, `tradeoff`, or `all`.
-Dataset availability, defaults, model order, supported classifiers, default IR,
-title behavior, and PNG resolution come from the `plots` section of
-`config/params.json`.
+The plotter replaces the historical aggregated-metric figures with all nine
+figures from `plotting_results_ver4.ipynb`. It reads `results/results_long.csv`
+and, for `timing`, `results/generation_timing.csv`. Paths are relative to the
+repository root, independently of the current working directory.
 
 ```bash
-# Generate the downstream-utility figure with default settings
-python main_plotter.py utility
+# All nine figures, each in PNG and PDF
+python main_plotter.py all
 
-# Choose the classifier used in utility metrics
+# All three utility profiles, or just one classifier
+python main_plotter.py utility
 python main_plotter.py utility --classifier random_forest
 
-# Generate the privacy figure
 python main_plotter.py privacy
+python main_plotter.py tradeoff --classifier logistic_regression
+python main_plotter.py detectability
+python main_plotter.py timing
 
-# Generate the trade-off figure for one classifier and one output IR
-python main_plotter.py tradeoff --classifier xgboost --output-ir 0.8
-
-# Generate utility, privacy, and trade-off figures together
-python main_plotter.py all --classifier logistic_regression --output-ir 1.0
-
-# Restrict any subcommand to configured datasets
-python main_plotter.py all \
-  --datasets heart_framingham cervical_cancer kidney_disease
-
-# Include automatically generated titles (titles are disabled by default)
-python main_plotter.py utility --title
-
-# Explicitly suppress titles, even if plots.default_title is changed to true
-python main_plotter.py all --no-title
-
-# Enable debug-level application logging
-python main_plotter.py privacy --verbose
-
-# Display general or subcommand-specific help
-python main_plotter.py --help
-python main_plotter.py tradeoff --help
+# Restrict datasets and classifier
+python main_plotter.py all --datasets heart_framingham cervical_cancer --classifier xgboost
 ```
 
-Options shared by all subcommands:
-
-| Option | Values and behavior |
+| Command | Notebook outputs |
 | --- | --- |
-| `--datasets DATASET [DATASET ...]` | Configured datasets; default: `plots.datasets` |
-| `--title` / `--no-title` | Enable or disable the generated figure title |
-| `--verbose` | Enable debug logging for the plotting application |
+| `utility` | `utility_profiles_{classifier}` in `figures/utility_profiles_final/` |
+| `privacy` | `figure_3_privacy_evaluation` in `figures/privacy_profiles_final/` |
+| `tradeoff` | XGBoost: `figure_4_privacy_utility_tradeoff_xgboost` in `figures/privacy_utility_tradeoff_final/`; Random Forest / Logistic Regression: `figure_S3_privacy_utility_tradeoff_random_forest` / `figure_S4_privacy_utility_tradeoff_logistic_regression` in `figures/supplementary_final/` |
+| `detectability` | `figure_S5_detectability_profiles` in `figures/supplementary_final/` |
+| `timing` | `figure_S6_computational_time` in `figures/supplementary_final/` |
+| `all` | All of the above; nine figures with the default classifier selection |
 
-Subcommand-specific options:
+`--classifier {all,xgboost,random_forest,logistic_regression}` is available for
+`utility`, `tradeoff`, and `all`, and defaults to `all`. `--datasets` is available
+for every command and defaults to the notebook's four datasets, configured in
+`plots.datasets`. The eight generators, their order, colors, metrics, reference
+lines, and seed statistics reproduce the notebook. Utility scales are calculated
+separately for each classifier, as in the notebook code. The historical
+`--output-ir` option is removed because these figures do not select an output IR.
 
-| Subcommand | Additional options |
-| --- | --- |
-| `utility` | `--classifier {logistic_regression,random_forest,xgboost}` |
-| `privacy` | None |
-| `tradeoff` | `--classifier ...`, `--output-ir FLOAT` (must be greater than zero) |
-| `all` | `--classifier ...`, `--output-ir FLOAT` (must be greater than zero) |
+All commands accept `--verbose` and `--title` / `--no-title`. By default there is
+no overall figure title, matching the notebook; panel titles remain present.
+`plots.png_dpi` controls PNG resolution (default 300). Both output formats retain
+the notebook filenames, so repeated commands replace matching outputs.
 
-Figures are saved as both PNG and PDF under:
-
-```text
-figures/evaluation_profiles/utility/
-figures/evaluation_profiles/privacy/
-figures/evaluation_profiles/tradeoff/
-```
+The notebook's data validation is retained, including duplicate detection,
+metric-specific status and fold filters, seed pairing for trade-offs, and timing
+completeness across both classes and seeds 13, 23, 42, 69, and 88. Timing sums the
+two class durations per seed before computing mean and sample standard deviation.
+Boxes show mean ± sample standard deviation bounded by extrema, with min–max
+whiskers; they are not quartile boxplots. Insufficient-resolution MIA observations
+and annotations follow the notebook. No training or evaluation runs are launched.
 
 ## Reproducibility and caching
 
@@ -345,6 +335,18 @@ The following caching behavior describes historical mode. The explicit
 uses separate model/result paths, and refuses model reuse or overwrites.
 See [A1 integration and no-training verification](docs/revision_a1_integration.md)
 for commands, evidence, limitations, and the ForestDiffusion execution block.
+The [follow-up audit and utility preparation](docs/revision_followup.md) documents
+the nine other generators, fixed-size balanced real baselines, validity reports,
+prediction records, and a pilot proposal that has not been executed.
+The [revised ForestDiffusion protocol](docs/revision_forest.md) implements classwise
+routing, reversible types, isolated RNG continuation, and simulated verification
+on all 20 pinned partitions. Real ForestDiffusion execution remains blocked.
+The [minimal real validation](docs/revision_forest_real_validation.md) records three
+small fits, exact sequence comparisons with reloads, and supervised resource use.
+The full ForestDiffusion benchmark remains blocked pending review.
+The [nine-generator incident report](docs/revision_generator_incidents.md) records
+revised parameter names and REaLTabFormer seed propagation, with parser, sampling
+budget, padding, and metadata changes separated as pending decisions.
 
 - Each dataset/seed split is generated once with stratification and then reused.
 - Training IR is never modified; requested output IR values are applied during

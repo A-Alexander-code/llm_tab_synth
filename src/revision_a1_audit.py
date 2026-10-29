@@ -126,7 +126,15 @@ def simulated_flow(run, split, model, base):
     factories = iter(frame for _, frame in expected)
 
     def factory(name, params):
-        require(name == model and params == run.config["model_params"][model], "Generator parameters mismatch")
+        from src.revision_generator_parameters import parameter_plan
+        effective = parameter_plan(model, run.config["model_params"][model], split.seed)["effective_wrapper_parameters"]
+        if model in ('ctgan', 'copulagan', 'tvae', 'gaussian_copula'):
+            # The approved contract adds shared semantic types after generic parameter
+            # migration. Reconstruct that addition independently; keep full equality.
+            from src.revision_sdv import schema_record
+            effective['_revision_parameters']['sdv_semantic_schema'] = schema_record(
+                split.names, run.policy['datasets'][split.dataset]['types'])
+        require(name == model and params == effective, "Generator parameters mismatch")
         return FixtureGenerator(next(factories), fit_records)
 
     def classifier(clf, X_train, y_train, X_test, y_test, clf_name, mode, save_path=None):

@@ -29,6 +29,9 @@ def _find_rtf_subdir(model_dir: Path) -> Path:
 class RealtabformerGenerator(BaseGenerator):
  
     def fit(self, df: pd.DataFrame, model_dir: Path) -> None:
+        from src.revision_generator_parameters import revised_context
+        revised = revised_context(self.params, "realtabformer")
+        seed_kwargs = {"random_state": self.params["random_state"]} if revised else {}
         os.environ["CUDA_VISIBLE_DEVICES"] = self.params.get("cuda_device", "0")
         model_dir.mkdir(parents=True, exist_ok=True)
 
@@ -39,6 +42,9 @@ class RealtabformerGenerator(BaseGenerator):
                 batch_size=self.params["batch_size"],
                 gradient_accumulation_steps=self.params["gradient_accumulation_steps"],
                 early_stopping_patience=self.params["early_stopping_patience"],
+                fp16=self.params.get("fp16", False),
+                dataloader_num_workers=self.params.get("dataloader_num_workers", 0),
+                **seed_kwargs,
             )
 
             fit_kwargs = {}

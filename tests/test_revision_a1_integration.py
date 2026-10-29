@@ -107,14 +107,16 @@ class A1IntegrationTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "config mismatch"):
                 RevisedRun(PINNED_RUN, config_path=path)
 
-    def test_forest_blocked_before_factory_or_output(self):
+    def test_forest_routes_to_classwise_adapter_without_legacy_factory(self):
         def forbidden(*args):
             self.fail("Real factory must not run")
         with tempfile.TemporaryDirectory() as temporary:
             base = Path(temporary)
-            with patch("src.revision_a1_runtime.RESULTS_DIR", base / "results"):
-                with self.assertRaisesRegex(ValueError, "ForestDiffusion blocked"):
+            with patch("src.revision_a1_runtime.RESULTS_DIR", base / "results"), \
+                 patch('src.revision_forest._sample_revised_split', side_effect=RuntimeError('explicit adapter boundary')) as adapter:
+                with self.assertRaisesRegex(RuntimeError, 'explicit adapter boundary'):
                     sample_split(self.artifact_run, self.split, "forestdiffusion", forbidden)
+                adapter.assert_called_once_with(self.artifact_run, self.split)
             self.assertEqual(list(base.iterdir()), [])
 
     def test_all_nine_simulated_sampler_evaluator_routes(self):

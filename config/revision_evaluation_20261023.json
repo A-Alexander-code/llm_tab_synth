@@ -1,0 +1,520 @@
+{
+  "experiment": {
+    "datasets": [
+      "heart_framingham",
+      "diabetes_prima_indian",
+      "diabetic_retinopathy",
+      "cervical_cancer"
+    ],
+    "models": [
+      "ctgan",
+      "copulagan",
+      "tvae",
+      "gaussian_copula",
+      "mostlyai",
+      "great",
+      "realtabformer",
+      "tabula"
+    ],
+    "seeds": [
+      13,
+      23,
+      42,
+      69,
+      88
+    ],
+    "imbalance_ratios": [],
+    "n_samples_per_class": 700,
+    "target_column": "class",
+    "test_split": 0.2
+  },
+  "model_params": {
+    "great": {
+      "llm": "/home/bperalta/.cache/huggingface/hub/models--distilgpt2/snapshots/2290a62682d06624634c1f46a6ad5be0f47f38aa",
+      "batch_size": 16,
+      "epochs": 200,
+      "fp16": true,
+      "dataloader_num_workers": 0,
+      "gradient_checkpointing": false,
+      "cuda_device": "0"
+    },
+    "tabula": {
+      "llm": "/home/bperalta/.cache/huggingface/hub/models--distilgpt2/snapshots/2290a62682d06624634c1f46a6ad5be0f47f38aa",
+      "batch_size": 32,
+      "epochs": 50,
+      "cuda_device": "0",
+      "max_length_sample": 200,
+      "temperature": 0.7,
+      "top_k": 100,
+      "sampling_limits": {
+        "max_generate_calls": 100,
+        "max_candidates": 10000,
+        "max_no_progress": 10
+      }
+    },
+    "realtabformer": {
+      "model_type": "tabular",
+      "epochs": 200,
+      "batch_size": 16,
+      "gradient_accumulation_steps": 4,
+      "early_stopping_patience": 5,
+      "cuda_device": "0",
+      "num_bootstrap": 100
+    },
+    "ctgan": {
+      "epochs": 300,
+      "batch_size": 500,
+      "generator_dim": [
+        256,
+        256
+      ],
+      "discriminator_dim": [
+        256,
+        256
+      ]
+    },
+    "tvae": {
+      "epochs": 300,
+      "batch_size": 500,
+      "compress_dims": [
+        128,
+        128
+      ],
+      "decompress_dims": [
+        128,
+        128
+      ],
+      "embedding_dim": 128
+    },
+    "gaussian_copula": {
+      "default_distribution": "norm"
+    },
+    "copulagan": {
+      "epochs": 300,
+      "batch_size": 500,
+      "generator_dim": [
+        256,
+        256
+      ],
+      "discriminator_dim": [
+        256,
+        256
+      ],
+      "default_distribution": "norm"
+    },
+    "tabpfgen": {
+      "n_sgld_steps": 500,
+      "sgld_step_size": 0.01,
+      "sgld_noise_scale": 0.01,
+      "device": "cpu",
+      "max_iterations": 200
+    },
+    "forestdiffusion": {
+      "n_t": 50,
+      "duplicate_K": 100,
+      "n_jobs": 4,
+      "nthread": 1
+    },
+    "mostlyai": {
+      "max_training_time": 300,
+      "max_epochs": 100,
+      "cuda_device": "cpu"
+    }
+  },
+  "plots": {
+    "datasets": [
+      "heart_framingham",
+      "cervical_cancer",
+      "diabetic_retinopathy",
+      "diabetes_prima_indian",
+      "kidney_disease"
+    ],
+    "model_order": [
+      "great",
+      "tabula",
+      "realtabformer",
+      "ctgan",
+      "copulagan",
+      "tvae",
+      "gaussian_copula",
+      "forestdiffusion",
+      "tabpfgen",
+      "mostlyai"
+    ],
+    "default_classifier": "xgboost",
+    "supported_classifiers": [
+      "logistic_regression",
+      "random_forest",
+      "xgboost"
+    ],
+    "default_output_ir": 1.0,
+    "default_title": false,
+    "png_dpi": 300
+  },
+  "revision_a1": {
+    "seeds": [
+      13,
+      23,
+      42,
+      69,
+      88
+    ],
+    "test_fraction": 0.2,
+    "group_split": "classwise_subset_sum_v1",
+    "mode_tie_break": "smallest_numeric_value",
+    "count_medians": "retain_fractional_values_as_float64",
+    "datasets": {
+      "heart_framingham": {
+        "column_mapping": {
+          "male": "sex",
+          "age": "age",
+          "education": "education",
+          "currentSmoker": "currentSmoker",
+          "cigsPerDay": "cigsPerDay",
+          "BPMeds": "BPMeds",
+          "prevalentStroke": "prevalentStroke",
+          "prevalentHyp": "prevalentHyp",
+          "diabetes": "diabetes",
+          "totChol": "totChol",
+          "sysBP": "sysBP",
+          "diaBP": "diaBP",
+          "BMI": "BMI",
+          "heartRate": "heartRate",
+          "glucose": "glucose",
+          "TenYearCHD": "class"
+        },
+        "source_target": "TenYearCHD",
+        "types": {
+          "sex": "binary",
+          "age": "count",
+          "education": "categorical",
+          "currentSmoker": "binary",
+          "cigsPerDay": "count",
+          "BPMeds": "binary",
+          "prevalentStroke": "binary",
+          "prevalentHyp": "binary",
+          "diabetes": "binary",
+          "totChol": "continuous",
+          "sysBP": "continuous",
+          "diaBP": "continuous",
+          "BMI": "continuous",
+          "heartRate": "continuous",
+          "glucose": "continuous"
+        },
+        "missing_tokens": [
+          "NA"
+        ],
+        "zero_as_missing": [],
+        "categorical_domains": {
+          "education": [
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        "drop_missing_threshold": null,
+        "target_documentation": {
+          "codes": [
+            0,
+            1
+          ],
+          "source_column": "TenYearCHD",
+          "clinical_code_meanings": "Not authenticated by a source codebook in this checkout; retain original numeric codes."
+        },
+        "pending_predictor_documentation": []
+      },
+      "diabetes_prima_indian": {
+        "column_mapping": {
+          "Pregnancies": "pregnancies",
+          "Glucose": "glucose",
+          "BloodPressure": "bloodpressure",
+          "SkinThickness": "skinthickness",
+          "Insulin": "insulin",
+          "BMI": "bmi",
+          "DiabetesPedigreeFunction": "diabetespedigreefunction",
+          "Age": "age",
+          "Outcome": "class"
+        },
+        "source_target": "Outcome",
+        "types": {
+          "pregnancies": "count",
+          "glucose": "continuous",
+          "bloodpressure": "continuous",
+          "skinthickness": "continuous",
+          "insulin": "continuous",
+          "bmi": "continuous",
+          "diabetespedigreefunction": "continuous",
+          "age": "count"
+        },
+        "missing_tokens": [],
+        "zero_as_missing": [
+          "glucose",
+          "bloodpressure",
+          "skinthickness",
+          "insulin",
+          "bmi"
+        ],
+        "categorical_domains": {},
+        "drop_missing_threshold": null,
+        "target_documentation": {
+          "codes": [
+            0,
+            1
+          ],
+          "source_column": "Outcome",
+          "clinical_code_meanings": "Not authenticated by a source codebook in this checkout; retain original numeric codes."
+        },
+        "pending_predictor_documentation": []
+      },
+      "diabetic_retinopathy": {
+        "column_mapping": {
+          "quality": "quality",
+          "pre_screening": "pre_screening",
+          "ma1": "ma1",
+          "ma2": "ma2",
+          "ma3": "ma3",
+          "ma4": "ma4",
+          "ma5": "ma5",
+          "ma6": "ma6",
+          "exudate1": "exudate1",
+          "exudate2": "exudate2",
+          "exudate3": "exudate3",
+          "exudate5": "exudate5",
+          "exudate6": "exudate6",
+          "exudate7": "exudate7",
+          "exudate8": "exudate8",
+          "macula_opticdisc_distance": "macula_opticdisc_distance",
+          "opticdisc_diameter": "opticdisc_diameter",
+          "am_fm_classification": "am_fm_classification",
+          "class": "class"
+        },
+        "source_target": "class",
+        "types": {
+          "quality": "binary",
+          "pre_screening": "binary",
+          "ma1": "count",
+          "ma2": "count",
+          "ma3": "count",
+          "ma4": "count",
+          "ma5": "count",
+          "ma6": "count",
+          "exudate1": "continuous",
+          "exudate2": "continuous",
+          "exudate3": "continuous",
+          "exudate5": "continuous",
+          "exudate6": "continuous",
+          "exudate7": "continuous",
+          "exudate8": "continuous",
+          "macula_opticdisc_distance": "continuous",
+          "opticdisc_diameter": "continuous",
+          "am_fm_classification": "binary"
+        },
+        "missing_tokens": [],
+        "zero_as_missing": [],
+        "categorical_domains": {},
+        "drop_missing_threshold": null,
+        "target_documentation": {
+          "codes": [
+            0,
+            1
+          ],
+          "source_column": "class",
+          "clinical_code_meanings": "Not authenticated by a source codebook in this checkout; retain original numeric codes."
+        },
+        "pending_predictor_documentation": []
+      },
+      "cervical_cancer": {
+        "column_mapping": {
+          "Age": "Age",
+          "Number of sexual partners": "Number_of_sexual_partners",
+          "First sexual intercourse": "First_sexual_intercourse",
+          "Num of pregnancies": "Num_of_pregnancies",
+          "Smokes": "Smokes",
+          "Smokes (years)": "Smokes_(years)",
+          "Smokes (packs/year)": "Smokes_(packs/year)",
+          "Hormonal Contraceptives": "Hormonal_Contraceptives",
+          "Hormonal Contraceptives (years)": "Hormonal_Contraceptives_(years)",
+          "IUD": "IUD",
+          "IUD (years)": "IUD_(years)",
+          "STDs": "STDs",
+          "STDs (number)": "STDs_(number)",
+          "STDs:condylomatosis": "STDs_condylomatosis",
+          "STDs:cervical condylomatosis": "STDs_cervical_condylomatosis",
+          "STDs:vaginal condylomatosis": "STDs_vaginal_condylomatosis",
+          "STDs:vulvo-perineal condylomatosis": "STDs_vulvo-perineal_condylomatosis",
+          "STDs:syphilis": "STDs_syphilis",
+          "STDs:pelvic inflammatory disease": "STDs_pelvic_inflammatory_disease",
+          "STDs:genital herpes": "STDs_genital_herpes",
+          "STDs:molluscum contagiosum": "STDs_molluscum_contagiosum",
+          "STDs:AIDS": "STDs_AIDS",
+          "STDs:HIV": "STDs_HIV",
+          "STDs:Hepatitis B": "STDs_Hepatitis_B",
+          "STDs:HPV": "STDs_HPV",
+          "STDs: Number of diagnosis": "STDs__Number_of_diagnosis",
+          "STDs: Time since first diagnosis": "STDs__Time_since_first_diagnosis",
+          "STDs: Time since last diagnosis": "STDs__Time_since_last_diagnosis",
+          "Dx:Cancer": "Dx_Cancer",
+          "Dx:CIN": "Dx_CIN",
+          "Dx:HPV": "Dx_HPV",
+          "Dx": "Dx",
+          "Hinselmann": "Hinselmann",
+          "Schiller": "Schiller",
+          "Citology": "Citology",
+          "Biopsy": "class"
+        },
+        "source_target": "Biopsy",
+        "types": {
+          "Age": "count",
+          "Number_of_sexual_partners": "count",
+          "First_sexual_intercourse": "count",
+          "Num_of_pregnancies": "count",
+          "Smokes": "binary",
+          "Smokes_(years)": "continuous",
+          "Smokes_(packs/year)": "continuous",
+          "Hormonal_Contraceptives": "binary",
+          "Hormonal_Contraceptives_(years)": "continuous",
+          "IUD": "binary",
+          "IUD_(years)": "continuous",
+          "STDs": "binary",
+          "STDs_(number)": "count",
+          "STDs_condylomatosis": "binary",
+          "STDs_cervical_condylomatosis": "binary",
+          "STDs_vaginal_condylomatosis": "binary",
+          "STDs_vulvo-perineal_condylomatosis": "binary",
+          "STDs_syphilis": "binary",
+          "STDs_pelvic_inflammatory_disease": "binary",
+          "STDs_genital_herpes": "binary",
+          "STDs_molluscum_contagiosum": "binary",
+          "STDs_AIDS": "binary",
+          "STDs_HIV": "binary",
+          "STDs_Hepatitis_B": "binary",
+          "STDs_HPV": "binary",
+          "STDs__Number_of_diagnosis": "count",
+          "STDs__Time_since_first_diagnosis": "count",
+          "STDs__Time_since_last_diagnosis": "count",
+          "Dx_Cancer": "binary",
+          "Dx_CIN": "binary",
+          "Dx_HPV": "binary",
+          "Dx": "binary",
+          "Hinselmann": "binary",
+          "Schiller": "binary",
+          "Citology": "binary"
+        },
+        "missing_tokens": [
+          "?"
+        ],
+        "zero_as_missing": [],
+        "categorical_domains": {},
+        "drop_missing_threshold": 0.6,
+        "target_documentation": {
+          "codes": [
+            0,
+            1
+          ],
+          "source_column": "Biopsy",
+          "clinical_code_meanings": "Not authenticated by a source codebook in this checkout; retain original numeric codes."
+        },
+        "pending_predictor_documentation": [
+          "Dx_Cancer",
+          "Dx_CIN",
+          "Dx_HPV",
+          "Dx",
+          "Hinselmann",
+          "Schiller",
+          "Citology"
+        ]
+      }
+    }
+  },
+  "revision_execution": {
+    "scope": "definitive_sequential_generation_simple_20261020_v1",
+    "evaluations": false,
+    "concurrency": 1,
+    "external_supervision": false
+  },
+  "evaluation_protocol": {
+    "name": "matched_train_privacy_v1",
+    "run_id": "33a9b4fce40753d94f4a3e2bf0c193f129e8edb5b6a19bb393544f747e2f3543",
+    "input_root": "results/revision_a1_simple",
+    "output_root": "results/evaluation/revision_a1_20261023",
+    "models": [
+      "ctgan",
+      "copulagan",
+      "tvae",
+      "gaussian_copula",
+      "mostlyai",
+      "great",
+      "realtabformer",
+      "tabula"
+    ],
+    "datasets": [
+      "heart_framingham",
+      "diabetes_prima_indian",
+      "diabetic_retinopathy",
+      "cervical_cancer"
+    ],
+    "seeds": [
+      13,
+      23,
+      42,
+      69,
+      88
+    ],
+    "synthetic_counts": "real_train_per_class",
+    "utility_conditions": [
+      "trtr_original",
+      "tstr"
+    ],
+    "selection": "without_replacement_source_rows; content_duplicates_retained",
+    "G_fraction": 0.2,
+    "mia_blocks": 3,
+    "mia_target_fpr": 0.01,
+    "utility_threshold": 0.5,
+    "neighborhood_k": [
+      3,
+      5
+    ],
+    "neighborhood_quantile": 0.25,
+    "distance": "Gower_equal_predictor_weights_ranges_G",
+    "detectability_folds": 5,
+    "bootstrap_repetitions": 200,
+    "attribute_scenarios": {
+      "heart_framingham": {
+        "secret": "diabetes",
+        "known": [
+          "age",
+          "sex"
+        ],
+        "regression": false
+      },
+      "diabetes_prima_indian": {
+        "secret": "pregnancies",
+        "known": [
+          "age",
+          "bmi"
+        ],
+        "regression": true
+      },
+      "cervical_cancer": {
+        "secret": "STDs",
+        "known": [
+          "Age",
+          "Smokes"
+        ],
+        "regression": false
+      },
+      "diabetic_retinopathy": {
+        "secret": "ma1",
+        "known": [
+          "macula_opticdisc_distance",
+          "opticdisc_diameter"
+        ],
+        "regression": true
+      }
+    },
+    "preserved_generation_configuration": "model_params retained for historical context; no generator is invoked",
+    "uncertainty": "200 group bootstrap repetitions; conditional on fitted attackers, thresholds and S; no 1% guarantee",
+    "scientific_interpretation": "technical evaluation; no rankings, cross-generator tests or privacy guarantees"
+  }
+}

@@ -132,8 +132,7 @@
       "heart_framingham",
       "cervical_cancer",
       "diabetic_retinopathy",
-      "diabetes_prima_indian",
-      "kidney_disease"
+      "diabetes_prima_indian"
     ],
     "model_order": [
       "great",
@@ -143,8 +142,6 @@
       "copulagan",
       "tvae",
       "gaussian_copula",
-      "forestdiffusion",
-      "tabpfgen",
       "mostlyai"
     ],
     "default_classifier": "xgboost",
@@ -153,7 +150,6 @@
       "random_forest",
       "xgboost"
     ],
-    "default_output_ir": 1.0,
     "default_title": false,
     "png_dpi": 300
   },

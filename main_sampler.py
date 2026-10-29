@@ -76,7 +76,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--force-retrain", action="store_true",
-        help="Force retraining even if the model already exists.",
+        help=("Force retraining even if the model already exists. In revised mode, replace models, samples "
+              "and training workspaces for the selected dataset/seed/model combinations, including previous identities."),
     )
     parser.add_argument(
         "--dry-run", action="store_true",

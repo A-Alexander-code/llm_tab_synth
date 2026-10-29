@@ -1,287 +1,448 @@
+"""Utility figures ported from notebook cell 1.
+
+Seed validation, summaries, axes and layout follow plotting_results_ver4.ipynb.
+No notebook execution or notebook dependency is required.
+"""
+
+from pathlib import Path
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from matplotlib.figure import Figure
 from matplotlib.patches import Patch
-
-from src.plots.common import draw_family_bands, finite_values, style_boxplot
-from src.plots.data import require_columns
-from src.plots.styles import (
-    MODEL_COLORS,
-    MODEL_FAMILIES,
-    MODEL_LABELS,
-    classifier_label,
-    dataset_label,
-)
-
-METRICS = ("aucroc", "auprc", "f1")
-
-METRIC_LABELS = {
-    "aucroc": "AUC-ROC",
-    "auprc": "AUC-PRC",
-    "f1": "F1-score",
-}
-
-METRIC_DIRECTIONS = {
-    "aucroc": "↑",
-    "auprc": "↑",
-    "f1": "↑",
-}
-
-FONT_SIZES = {
-    "default": 14,
-    "suptitle": 19,
-    "subplot_title": 17,
-    "dataset_label": 14,
-    "x_tick": 14,
-    "y_tick": 14,
-    "model_legend": 15,
-    "model_legend_title": 16,
-    "family_legend": 14,
-    "family_legend_title": 15,
-}
+from matplotlib.lines import Line2D
+from src.plots.styles import DATASET_LABELS, MODEL_ORDER, MODEL_LABELS, MODEL_COLORS
 
 
-def build_utility_table(
-    raw_data: pd.DataFrame,
-    datasets: tuple[str, ...],
-    model_order: tuple[str, ...],
-    classifier: str,
-) -> pd.DataFrame:
-    require_columns(
-        raw_data,
-        (
-            "dataset",
-            "block",
-            "classifier",
-            "model",
-            "metric",
-            "mean",
-            "output_ir",
-        ),
-        "utility plot",
+def run(datasets, classifiers, project_root, png_dpi=300, include_title=False):
+    """Generate the notebook figures for the selected datasets and classifiers."""
+
+    PROJECT_ROOT = project_root
+    CSV_PATH = PROJECT_ROOT / "results" / "results_long.csv"
+    FIGURES_DIR = PROJECT_ROOT / "figures" / "utility_profiles_final"
+    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+
+    Y_PADDING_RATIO = 0.20
+    MIN_Y_PADDING = 0.05
+
+    DATASETS = list(datasets)
+    dataset_labels = {d: DATASET_LABELS.get(d, d.replace("_", " ").title()) for d in DATASETS}
+
+
+
+
+
+    MODEL_FAMILIES = [
+        {
+            "label": "LLM-based generators",
+            "models": ["great", "tabula", "realtabformer"],
+            "color": "#DDEBFF",
+        },
+        {
+            "label": "Comparison generators",
+            "models": ["ctgan", "copulagan", "tvae", "gaussian_copula", "mostlyai"],
+            "color": "#FFF1CC",
+        },
+    ]
+
+    CLASSIFIERS = {
+        "xgboost": "XGBoost",
+        "random_forest": "Random Forest",
+        "logistic_regression": "Logistic Regression",
+    }
+
+    METRICS = {
+        "utility_auroc": "AUCROC",
+        "utility_average_precision": "Average Precision",
+        "utility_f1": "F1-score",
+    }
+
+    RATIO_METRICS = {
+        "utility_auroc",
+        "utility_average_precision",
+        "utility_f1",
+        "utility_ppv",
+        "utility_sensitivity",
+        "utility_specificity",
+    }
+
+    plt.rcParams.update({
+        "font.family": "sans-serif",
+        "font.size": 12,
+        "axes.titlesize": 15,
+        "axes.labelsize": 13,
+        "xtick.labelsize": 10,
+        "ytick.labelsize": 11,
+        "legend.fontsize": 11,
+        "pdf.fonttype": 42,
+        "ps.fonttype": 42,
+    })
+
+    df = pd.read_csv(CSV_PATH)
+
+    required_columns = {
+        "dataset", "seed", "generador", "component",
+        "condition", "classifier", "metric", "value", "status"
+    }
+
+    missing_columns = required_columns - set(df.columns)
+
+    if missing_columns:
+        raise ValueError(f"Missing columns: {sorted(missing_columns)}")
+
+    df["value"] = pd.to_numeric(df["value"], errors="coerce")
+
+    # Repair values corrupted by a thousands separator (0.688 -> 688)
+    thousands_mask = (
+        df["metric"].isin(RATIO_METRICS)
+        & df["value"].between(1, 1000, inclusive="neither")
+        & (df["value"] % 1 == 0)
     )
 
-    valid_metrics = [f"tstr_{metric}" for metric in METRICS]
-    data = raw_data[
-        raw_data["dataset"].isin(datasets)
-        & (raw_data["block"] == "utility_ml")
-        & (raw_data["classifier"] == classifier)
-        & raw_data["model"].isin(model_order)
-        & raw_data["metric"].isin(valid_metrics)
+    if thousands_mask.any():
+        print(f"Repairing {thousands_mask.sum()} values divided by 1000:")
+        print(
+            df.loc[
+                thousands_mask,
+                ["dataset", "seed", "generador", "classifier", "metric", "value"]
+            ].to_string()
+        )
+        df.loc[thousands_mask, "value"] = df.loc[thousands_mask, "value"] / 1000
+
+    df = df.loc[
+        df["dataset"].isin(DATASETS)
+        & df["classifier"].isin(CLASSIFIERS)
+        & df["metric"].isin(METRICS)
+        & df["status"].eq("ok")
+        & (
+            (
+                df["component"].eq("utility_tstr")
+                & df["condition"].eq("tstr")
+                & df["generador"].isin(MODEL_ORDER)
+            )
+            |
+            (
+                df["component"].eq("trtr_original")
+                & df["generador"].eq("real")
+                & df["condition"].eq("trtr_original")
+            )
+        )
     ].copy()
 
-    if data.empty:
+    df = df.dropna(subset=["value"])
+
+    out_of_range = (df["value"] < 0) | (df["value"] > 1)
+
+    if out_of_range.any():
+        print("Values outside [0, 1] excluded:")
+        print(
+            df.loc[
+                out_of_range,
+                ["dataset", "seed", "generador", "classifier", "metric", "value"]
+            ].to_string()
+        )
+        df = df.loc[~out_of_range].copy()
+
+    df["evaluation"] = np.where(df["generador"].eq("real"), "trtr", "tstr")
+
+    duplicate_columns = [
+        "dataset", "seed", "generador", "classifier", "metric", "evaluation"
+    ]
+
+    duplicates = df.duplicated(subset=duplicate_columns, keep=False)
+
+    if duplicates.any():
         raise ValueError(
-            "No utility metrics were found for the selected parameters."
+            "Duplicate utility observations detected:\n"
+            f"{df.loc[duplicates, duplicate_columns].head(10)}"
         )
 
-    data["metric_base"] = data["metric"].str.replace(
-        r"^tstr_",
-        "",
-        regex=True,
-    )
-    data["dataset"] = pd.Categorical(
-        data["dataset"],
-        categories=datasets,
-        ordered=True,
-    )
-    data["model"] = pd.Categorical(
-        data["model"],
-        categories=model_order,
-        ordered=True,
-    )
-    data["metric_base"] = pd.Categorical(
-        data["metric_base"],
-        categories=METRICS,
-        ordered=True,
+    if df.empty:
+        raise ValueError("No valid utility results found.")
+
+    trtr = df.loc[df["evaluation"].eq("trtr")].copy()
+    tstr = df.loc[df["evaluation"].eq("tstr")].copy()
+
+    summary = (
+        tstr.groupby(["dataset", "classifier", "metric", "generador"])["value"]
+        .agg(mean="mean", std="std", minimum="min", maximum="max", n="count")
+        .reset_index()
     )
 
-    return data.sort_values(
-        ["dataset", "metric_base", "model", "output_ir"]
+    summary["std"] = summary["std"].fillna(0)
+
+    trtr_summary = (
+        trtr.groupby(["dataset", "classifier", "metric"])["value"]
+        .agg(mean="mean", n="count")
+        .reset_index()
     )
 
 
-def utility_output_basename(classifier: str) -> str:
-    return f"figure_utility_profiles_tstr_only_taxonomy_{classifier}"
+    def get_classifier_y_limits(data, classifier):
+
+        limits = {}
+
+        for metric in METRICS:
+
+            values = data.loc[
+                data["classifier"].eq(classifier)
+                & data["metric"].eq(metric),
+                "value"
+            ].to_numpy(dtype=float)
+
+            values = values[np.isfinite(values)]
+
+            if not len(values):
+                raise ValueError(f"No values for {classifier} / {metric}")
+
+            ymin = float(values.min())
+            ymax = float(values.max())
+
+            padding = max(MIN_Y_PADDING, (ymax - ymin) * Y_PADDING_RATIO)
+
+            limits[metric] = (ymin - padding, ymax + padding)
+
+        return limits
 
 
-def create_utility_figure(
-    data: pd.DataFrame,
-    datasets: tuple[str, ...],
-    model_order: tuple[str, ...],
-    classifier: str,
-    include_title: bool,
-) -> Figure:
-    datasets_to_plot = tuple(
-        dataset
-        for dataset in datasets
-        if dataset in data["dataset"].dropna().astype(str).unique()
-    )
+    def build_box_stats(subset, model):
 
-    if not datasets_to_plot:
-        raise ValueError("No valid datasets were found after filtering.")
+        row = subset.loc[subset["generador"].eq(model)]
 
-    plt.rcParams.update(
-        {
-            "font.size": FONT_SIZES["default"],
-            "font.family": "sans-serif",
-            "axes.titlesize": FONT_SIZES["subplot_title"],
-            "axes.labelsize": FONT_SIZES["dataset_label"],
-            "xtick.labelsize": FONT_SIZES["x_tick"],
-            "ytick.labelsize": FONT_SIZES["y_tick"],
-            "legend.fontsize": FONT_SIZES["model_legend"],
-            "legend.title_fontsize": FONT_SIZES["model_legend_title"],
+        if row.empty:
+            return {
+                "med": np.nan,
+                "q1": np.nan,
+                "q3": np.nan,
+                "whislo": np.nan,
+                "whishi": np.nan,
+                "fliers": []
+            }
+
+        row = row.iloc[0]
+
+        return {
+            "med": row["mean"],
+            "q1": max(row["mean"] - row["std"], row["minimum"]),
+            "q3": min(row["mean"] + row["std"], row["maximum"]),
+            "whislo": row["minimum"],
+            "whishi": row["maximum"],
+            "fliers": []
         }
-    )
 
-    figure, axes = plt.subplots(
-        len(datasets_to_plot),
-        len(METRICS),
-        figsize=(15, max(8, 3.0 * len(datasets_to_plot))),
-        sharex=True,
-        sharey=False,
-        squeeze=False,
-    )
-    positions = np.arange(len(model_order))
 
-    for row_index, dataset in enumerate(datasets_to_plot):
-        for column_index, metric in enumerate(METRICS):
-            ax = axes[row_index, column_index]
-            subset = data[
-                (data["dataset"] == dataset)
-                & (data["metric_base"] == metric)
-            ]
+    def draw_family_bands(ax):
 
-            draw_family_bands(ax, model_order)
-            values = [
-                _boxplot_values(subset, model)
-                for model in model_order
-            ]
-            boxplot = ax.boxplot(
-                values,
-                positions=positions,
-                widths=0.45,
-                patch_artist=True,
-                showfliers=False,
-                manage_ticks=False,
-            )
-            style_boxplot(boxplot, model_order)
+        for family in MODEL_FAMILIES:
 
-            y_min, y_max = _subplot_limits(subset)
-            ax.set_ylim(y_min, y_max)
-            ax.set_xlim(-0.5, len(model_order) - 0.5)
-            ax.grid(
-                axis="y",
-                linestyle=":",
-                linewidth=0.5,
+            indices = [MODEL_ORDER.index(model) for model in family["models"]]
+
+            ax.axvspan(
+                min(indices) - 0.5,
+                max(indices) + 0.5,
+                facecolor=family["color"],
                 alpha=0.65,
-                zorder=2,
-            )
-            ax.tick_params(
-                axis="y",
-                labelsize=FONT_SIZES["y_tick"],
+                zorder=0
             )
 
-            if row_index == 0:
-                ax.set_title(
-                    f"{METRIC_LABELS[metric]} "
-                    f"({METRIC_DIRECTIONS[metric]})",
-                    fontsize=FONT_SIZES["subplot_title"],
-                )
+        ax.axvline(2.5, color="white", linewidth=2, zorder=1)
 
-            if column_index == 0:
-                ax.set_ylabel(
-                    dataset_label(dataset),
-                    fontsize=FONT_SIZES["dataset_label"],
-                )
 
-            if row_index == len(datasets_to_plot) - 1:
-                ax.set_xticks(positions)
-                ax.set_xticklabels(
-                    [MODEL_LABELS[model] for model in model_order],
-                    rotation=60,
-                    ha="right",
-                    fontsize=FONT_SIZES["x_tick"],
-                )
-            else:
-                ax.tick_params(axis="x", labelbottom=False)
+    def plot_utility_profiles(classifier, classifier_label):
 
-    model_handles = [
-        Patch(
-            facecolor=MODEL_COLORS[model],
-            edgecolor="black",
-            label=MODEL_LABELS[model],
-            alpha=0.90,
-        )
-        for model in model_order
-    ]
-    family_handles = [
-        Patch(
-            facecolor=family["color"],
-            edgecolor="none",
-            label=family["label"],
-            alpha=0.75,
-        )
-        for family in MODEL_FAMILIES
-    ]
-    model_legend = figure.legend(
-        handles=model_handles,
-        loc="lower center",
-        ncol=5,
-        frameon=True,
-        fancybox=True,
-        fontsize=FONT_SIZES["model_legend"],
-        title="Generative model color code",
-        title_fontsize=FONT_SIZES["model_legend_title"],
-        bbox_to_anchor=(0.5, 0.035),
-        borderpad=0.8,
-        columnspacing=1.4,
-        handlelength=1.6,
-    )
-    figure.legend(
-        handles=family_handles,
-        loc="lower center",
-        ncol=3,
-        frameon=False,
-        fontsize=FONT_SIZES["family_legend"],
-        title="Taxonomic family bands",
-        title_fontsize=FONT_SIZES["family_legend_title"],
-        bbox_to_anchor=(0.5, -0.01),
-        columnspacing=1.6,
-        handlelength=1.8,
-    )
-    figure.add_artist(model_legend)
+        y_limits = get_classifier_y_limits(df, classifier)
 
-    if include_title:
-        figure.suptitle(
-            "Downstream utility profiles by dataset | "
-            f"Classifier: {classifier_label(classifier)}",
-            fontsize=FONT_SIZES["suptitle"],
-            y=0.995,
+        fig, axes = plt.subplots(
+            len(DATASETS),
+            len(METRICS),
+            figsize=(16, 14),
+            sharex=True,
+            squeeze=False
         )
 
-    figure.tight_layout(rect=[0, 0.13, 1, 0.975])
-    return figure
+        positions = np.arange(len(MODEL_ORDER))
+
+        for row_idx, dataset in enumerate(DATASETS):
+
+            for col_idx, (metric, metric_label) in enumerate(METRICS.items()):
+
+                ax = axes[row_idx, col_idx]
+
+                subset = summary.loc[
+                    summary["dataset"].eq(dataset)
+                    & summary["classifier"].eq(classifier)
+                    & summary["metric"].eq(metric)
+                ]
+
+                reference = trtr_summary.loc[
+                    trtr_summary["dataset"].eq(dataset)
+                    & trtr_summary["classifier"].eq(classifier)
+                    & trtr_summary["metric"].eq(metric)
+                ]
+
+                draw_family_bands(ax)
+
+                stats = [build_box_stats(subset, model) for model in MODEL_ORDER]
+
+                bp = ax.bxp(
+                    stats,
+                    positions=positions,
+                    widths=0.5,
+                    patch_artist=True,
+                    showfliers=False,
+                    manage_ticks=False
+                )
+
+                for box, model in zip(bp["boxes"], MODEL_ORDER):
+                    box.set(
+                        facecolor=MODEL_COLORS[model],
+                        edgecolor="black",
+                        alpha=0.9,
+                        linewidth=0.8
+                    )
+
+                for item in bp["whiskers"] + bp["caps"]:
+                    item.set(color="black", linewidth=0.8)
+
+                for item in bp["medians"]:
+                    item.set(color="black", linewidth=1.2)
+
+                if not reference.empty:
+
+                    trtr_mean = float(reference.iloc[0]["mean"])
+
+                    ax.axhline(
+                        trtr_mean,
+                        color="black",
+                        linestyle="--",
+                        linewidth=1.4,
+                        zorder=5
+                    )
+
+                    ax.text(
+                        0.02,
+                        0.03,
+                        f"TRTR = {trtr_mean:.3f}",
+                        transform=ax.transAxes,
+                        ha="left",
+                        va="bottom",
+                        fontsize=10,
+                        fontweight="bold",
+                        bbox={
+                            "facecolor": "white",
+                            "edgecolor": "none",
+                            "alpha": 0.8,
+                            "pad": 2
+                        },
+                        zorder=6
+                    )
+
+                ax.set_xlim(-0.5, len(MODEL_ORDER) - 0.5)
+                ax.set_ylim(*y_limits[metric])
+                ax.set_yticks(
+                    [t for t in ax.get_yticks() if -1e-9 <= t <= 1.0 + 1e-9]
+                )
+                ax.set_ylim(*y_limits[metric])
+
+                ax.grid(
+                    axis="y",
+                    linestyle=":",
+                    linewidth=0.6,
+                    alpha=0.65,
+                    zorder=2
+                )
+
+                if row_idx == 0:
+                    ax.set_title(f"{metric_label} (↑)")
+
+                if col_idx == 0:
+                    ax.set_ylabel(dataset_labels[dataset], labelpad=12)
+
+                if row_idx == len(DATASETS) - 1:
+                    ax.set_xticks(positions)
+                    ax.set_xticklabels(
+                        [MODEL_LABELS[m] for m in MODEL_ORDER],
+                        rotation=60,
+                        ha="right"
+                    )
+                else:
+                    ax.tick_params(axis="x", labelbottom=False)
+
+        model_handles = [
+            Patch(
+                facecolor=MODEL_COLORS[model],
+                edgecolor="black",
+                label=MODEL_LABELS[model]
+            )
+            for model in MODEL_ORDER
+        ]
+
+        fig.legend(
+            handles=model_handles,
+            loc="lower center",
+            bbox_to_anchor=(0.5, 0.087),
+            ncol=4,
+            title="Generative model color code",
+            frameon=True,
+            fontsize=11
+        )
+
+        fig.legend(
+            handles=[
+                Line2D(
+                    [0], [0],
+                    color="black",
+                    linestyle="--",
+                    linewidth=1.5,
+                    label="Dashed horizontal lines indicate the five-seed TRTR mean"
+                )
+            ],
+            loc="lower center",
+            bbox_to_anchor=(0.5, 0.045),
+            frameon=False
+        )
+
+        family_handles = [
+            Patch(
+                facecolor=family["color"],
+                edgecolor="none",
+                label=family["label"],
+                alpha=0.75
+            )
+            for family in MODEL_FAMILIES
+        ]
+
+        fig.legend(
+            handles=family_handles,
+            loc="lower center",
+            bbox_to_anchor=(0.5, 0.015),
+            ncol=2,
+            frameon=False
+        )
+
+        fig.tight_layout(rect=[0.02, 0.15, 1, 0.965])
+
+        output_name = f"utility_profiles_{classifier}"
+        png_path = FIGURES_DIR / f"{output_name}.png"
+        pdf_path = FIGURES_DIR / f"{output_name}.pdf"
+
+        if include_title:
+            fig.suptitle("Utility", y=1.01)
+
+        fig.savefig(png_path, dpi=png_dpi, bbox_inches="tight")
+        fig.savefig(pdf_path, bbox_inches="tight")
+
+        plt.close(fig)
+
+        print(f"Saved: {png_path}")
+        print(f"Saved: {pdf_path}")
+
+        print(f"\nY-axis limits for {classifier_label}:")
+
+        for metric, limits in y_limits.items():
+            print(f"  {METRICS[metric]}: {limits[0]:.3f} – {limits[1]:.3f}")
 
 
-def _boxplot_values(subset: pd.DataFrame, model: str) -> np.ndarray:
-    values = finite_values(subset[subset["model"] == model]["mean"])
-    return values if len(values) else np.array([np.nan])
-
-
-def _subplot_limits(subset: pd.DataFrame) -> tuple[float, float]:
-    values = finite_values(subset["mean"])
-
-    if not len(values):
-        return 0.0, 1.0
-
-    y_min = float(np.min(values))
-    y_max = float(np.max(values))
-
-    if np.isclose(y_min, y_max):
-        margin = 0.01 if y_max == 0 else abs(y_max) * 0.01
-        y_min = max(0.0, y_min - margin)
-        y_max = min(1.0, y_max + margin)
-
-    return y_min, y_max
+    for classifier, classifier_label in CLASSIFIERS.items():
+        if classifier not in classifiers:
+            continue
+        plot_utility_profiles(classifier, classifier_label)

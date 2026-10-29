@@ -19,7 +19,7 @@ from src.training_workspace import training_workspace
 def _restore_great_from_dir(model_dir: Path) -> GReaT:
 
     config_path = model_dir.joinpath("config.json")
-    model_pt    = model_dir.joinpath("model.pt")
+    model_pt = model_dir.joinpath("model.pt")
  
     if not config_path.exists():
         raise FileNotFoundError(f"config.json not found in {model_dir}")
@@ -40,7 +40,7 @@ def _restore_great_from_dir(model_dir: Path) -> GReaT:
         except AttributeError:
             pass 
  
-    buffer     = io.BytesIO(model_pt.read_bytes())
+    buffer = io.BytesIO(model_pt.read_bytes())
     state_dict = torch.load(buffer, map_location="cpu", weights_only=True)
     model.model.load_state_dict(state_dict)
  
@@ -50,6 +50,11 @@ def _restore_great_from_dir(model_dir: Path) -> GReaT:
 class GreatGenerator(BaseGenerator):
  
     def fit(self, df: pd.DataFrame, model_dir: Path) -> None:
+        from src.revision_generator_parameters import revised_context
+        revised = revised_context(self.params, "great")
+        if revised:
+            from src.revision_great import check_parameter_identity
+            check_parameter_identity(revised)
         os.environ["CUDA_VISIBLE_DEVICES"] = self.params.get("cuda_device", "0")
         model_dir.mkdir(parents=True, exist_ok=True)
 
@@ -67,10 +72,22 @@ class GreatGenerator(BaseGenerator):
         if model_dir.exists():
             shutil.rmtree(model_dir)
         model.save(str(model_dir))
+        if revised:
+            from src.revision_great import save_model_identity
+            save_model_identity(model_dir, revised)
  
     def sample(self, n_samples: int, model_dir: Path) -> pd.DataFrame:
+        from src.revision_generator_parameters import revised_context
+        revised = revised_context(self.params, "great")
+        if revised:
+            from src.revision_great import check_model_identity
+            check_model_identity(model_dir, revised)  # Reject before restoring/loading any weights.
         os.environ["CUDA_VISIBLE_DEVICES"] = self.params.get("cuda_device", "0")
         model = _restore_great_from_dir(model_dir)
+        if revised:
+            from src.revision_great import sample_with_correction
+            self.sampling_observations = {}
+            return sample_with_correction(model, n_samples, model_dir, self.sampling_observations)
         return model.sample(
             n_samples,
             guided_sampling=True,

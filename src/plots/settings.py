@@ -13,7 +13,6 @@ class PlotSettings:
     model_order: tuple[str, ...]
     supported_classifiers: tuple[str, ...]
     default_classifier: str
-    default_output_ir: float
     default_title: bool
     png_dpi: int
 
@@ -38,7 +37,6 @@ def load_plot_settings(params_file: Path = PARAMS_FILE) -> PlotSettings:
         model_order=tuple(plots.get("model_order", [])),
         supported_classifiers=tuple(plots.get("supported_classifiers", [])),
         default_classifier=str(plots.get("default_classifier", "xgboost")),
-        default_output_ir=float(plots.get("default_output_ir", 1.0)),
         default_title=bool(plots.get("default_title", False)),
         png_dpi=int(plots.get("png_dpi", 300)),
     )
@@ -82,9 +80,6 @@ def validate_plot_settings(settings: PlotSettings) -> None:
             "plots.default_classifier must be included in "
             "plots.supported_classifiers."
         )
-
-    if settings.default_output_ir <= 0:
-        raise ValueError("plots.default_output_ir must be greater than zero.")
 
     if settings.png_dpi <= 0:
         raise ValueError("plots.png_dpi must be greater than zero.")

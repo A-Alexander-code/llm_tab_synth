@@ -318,3 +318,163 @@ def compute_kanonymity(synth: pd.DataFrame,
         ]
 
     return rows
+
+
+# The functions above retain the historical protocol. The matched-train protocol
+# uses the explicit, train-auxiliary geometry below; it never calls fillna(0).
+class MixedGeometry:
+    """Equal-weight, bounded Gower-type contributions in original column order.
+
+    Range parameters come only from G. No clinical target, one-hot weighting,
+    rounding, fitted synthetic domains, or implicit ordinal interpretation.
+    """
+    def __init__(self, G, names, types):
+        from src.revision_a1_runtime import real_numeric_matrix
+        if list(G.columns) != list(names) or not len(G) or not names:
+            raise ValueError("Invalid auxiliary geometry schema/size")
+        values = real_numeric_matrix(G)
+        self.names = list(names)
+        self.types = [types[c] for c in names]
+        if not set(self.types).issubset({"continuous", "count", "binary", "categorical"}):
+            raise ValueError("Unknown semantic type")
+        self.low, self.high = values.min(axis=0), values.max(axis=0)
+        self.ranges = self.high - self.low
+
+    def record(self):
+        return {"definition": "mean_j(delta_j); numeric=min(1,abs(x-z)/range_G); categorical=1[x!=z]",
+                "constant_numeric": "1[x!=z]", "ordinal_policy": "none; education nominal",
+                "target_included": False, "missing_policy": "not_computable; no imputation",
+                "range_fit": "G only", "columns": [
+                    {"name": c, "type": t, "weight": 1 / len(self.names),
+                     "min_G": float(a), "max_G": float(b), "range_G": float(b-a)}
+                    for c, t, a, b in zip(self.names, self.types, self.low, self.high)]}
+
+    def matrix(self, frame):
+        from src.revision_a1_runtime import real_numeric_matrix
+        if list(frame.columns) != self.names:
+            raise ValueError("Mixed geometry column order mismatch")
+        return real_numeric_matrix(frame)
+
+    def blocks(self, query, reference, batch=128):
+        Q, R = self.matrix(query), self.matrix(reference)
+        if not len(Q) or not len(R):
+            raise ValueError("Empty distance query/reference")
+        for start in range(0, len(Q), batch):
+            q = Q[start:start+batch]
+            distance = np.zeros((len(q), len(R)), dtype=float)
+            for j, kind in enumerate(self.types):
+                if kind in {"binary", "categorical"} or self.ranges[j] == 0:
+                    distance += q[:, j, None] != R[None, :, j]
+                else:
+                    distance += np.minimum(1., np.abs(q[:, j, None] - R[None, :, j]) / self.ranges[j])
+            yield start, distance / len(self.names)
+
+    def nearest(self, query, reference, *, exclude_self=False):
+        if exclude_self and (len(query) < 2 or not query.equals(reference)):
+            raise ValueError("Self-exclusion requires the same set with at least two rows")
+        result = np.empty(len(query))
+        for start, distances in self.blocks(query, reference):
+            if exclude_self:
+                distances[np.arange(len(distances)), start + np.arange(len(distances))] = np.inf
+            result[start:start+len(distances)] = distances.min(axis=1)
+        return result
+
+    def neighborhood(self, query, reference, radius, reference_groups):
+        if not np.isfinite(radius) or radius < 0 or len(reference) != len(reference_groups):
+            raise ValueError("Invalid neighborhood radius/groups")
+        row_counts, group_counts = [], []
+        groups = np.asarray(reference_groups)
+        for _, distances in self.blocks(query, reference):
+            inside = distances <= radius
+            row_counts.extend(inside.sum(axis=1).tolist())
+            group_counts.extend(len(set(groups[mask].tolist())) for mask in inside)
+        return np.asarray(row_counts), np.asarray(group_counts)
+
+
+def distance_summary(distances):
+    """Linear percentiles; trim floor(0.10*n) observations from EACH tail."""
+    d = np.asarray(distances)
+    if not len(d) or not np.isfinite(d).all():
+        raise ValueError("Empty/nonfinite distances")
+    cut = int(np.floor(.1 * len(d)))
+    ordered = np.sort(d)
+    trimmed = ordered[cut:len(d)-cut] if cut else ordered
+    return {"mean": float(d.mean()), "median": float(np.median(d)),
+            **{f"p{p}": float(np.percentile(d, p, method="linear")) for p in (5, 90, 95, 99)},
+            "trimmed_mean_10pct_each_tail": float(trimmed.mean()),
+            "zero_count": int((d == 0).sum()), "n_rows": len(d), "trimmed_each_tail": cut}
+
+
+def mixed_nnaa(geometry, real, synth):
+    if len(real) != len(synth) or len(real) < 2:
+        raise ValueError("NNAA requires equal sets of at least two rows")
+    rr = geometry.nearest(real, real, exclude_self=True)
+    ss = geometry.nearest(synth, synth, exclude_self=True)
+    rs, sr = geometry.nearest(real, synth), geometry.nearest(synth, real)
+    score_r = (rr < rs).astype(float) + .5 * (rr == rs)
+    score_s = (ss < sr).astype(float) + .5 * (ss == sr)
+    return {"real": float(score_r.mean()), "synthetic": float(score_s.mean()),
+            "overall": float(.5 * (score_r.mean() + score_s.mean())),
+            "real_ties": int((rr == rs).sum()), "synthetic_ties": int((ss == sr).sum())}, \
+        pd.DataFrame({"population": ["member"]*len(real)+["synthetic"]*len(synth),
+                      "internal_distance": np.r_[rr, ss], "external_distance": np.r_[rs, sr],
+                      "contribution": np.r_[score_r, score_s]})
+
+
+def calibrate_membership_threshold(negative_scores, target=.01):
+    """No interpolation/random ties: member iff score STRICTLY exceeds threshold."""
+    scores = np.asarray(negative_scores)
+    if not len(scores) or not np.isfinite(scores).all() or target != .01:
+        raise ValueError("Invalid 1% MIA calibration")
+    q = int(np.floor(target * len(scores)))
+    threshold = float(np.sort(scores)[::-1][q])
+    return {"threshold": threshold, "n_nonmembers": len(scores), "allowed_fp": q,
+            "calibration_fp": int((scores > threshold).sum()), "comparison": "score > threshold",
+            "target_fpr": target, "fpr_resolution": 1 / len(scores),
+            "resolution_status": "insufficient_low_fpr_resolution" if len(scores) < 100 else "finite_sample_estimate",
+            "interpretation": "TPR with threshold calibrated to target FPR 1%; not observed FPR exactly 1%"}
+
+
+def explicit_attack_forest(seed, *, regression=False):
+    from sklearn.ensemble import RandomForestRegressor
+    common = dict(n_estimators=100, criterion="squared_error" if regression else "gini",
+                  max_depth=None, min_samples_split=2, min_samples_leaf=1,
+                  min_weight_fraction_leaf=0., max_features=1.0 if regression else "sqrt",
+                  max_leaf_nodes=None, min_impurity_decrease=0., bootstrap=True,
+                  oob_score=False, n_jobs=1, random_state=seed, verbose=0,
+                  warm_start=False, ccp_alpha=0., max_samples=None)
+    return (RandomForestRegressor if regression else RandomForestClassifier)(**common)
+
+
+def grouped_rate_intervals(predictions, seed, repetitions=200):
+    """Conditional cluster bootstrap of held-out decisions; no attacker refitting.
+
+    Identical real predictor/source groups are always resampled as one cluster.
+    Seeds/folds are not treated as independent patients. Empty bootstrap rates
+    are omitted explicitly, with counts retained in the evidence record.
+    """
+    by_fold = []
+    for _, fold in predictions.groupby("fold", sort=True):
+        grouped = []
+        for _, frame in fold.groupby("attack_group", sort=True):
+            y, p = frame.membership.to_numpy(), frame.predicted_member.to_numpy()
+            grouped.append([int(((y == 1) & (p == 1)).sum()), int((y == 1).sum()),
+                            int(((y == 0) & (p == 1)).sum()), int((y == 0).sum())])
+        by_fold.append(np.asarray(grouped))
+    if not by_fold or repetitions < 1:
+        raise ValueError("Insufficient bootstrap groups/repetitions")
+    rng = np.random.default_rng(seed)
+    rates = {"tpr": [], "fpr": []}
+    for _ in range(repetitions):
+        total = sum((counts[rng.integers(0, len(counts), size=len(counts))].sum(axis=0)
+                     for counts in by_fold), np.zeros(4, dtype=int))
+        for name, num, den in (("tpr", 0, 1), ("fpr", 2, 3)):
+            if total[den]:
+                rates[name].append(float(total[num] / total[den]))
+    return {"method": "group cluster bootstrap, percentile 95%, conditional on fitted attacks/thresholds/S",
+            "caveat": "zero observed false positives can give a degenerate bootstrap interval; not a population guarantee",
+            "seed": seed, "repetitions": repetitions, "groups": sum(map(len, by_fold)),
+            "fold_group_counts": list(map(len, by_fold)),
+            "rates": {k: {"low": float(np.percentile(v, 2.5)), "high": float(np.percentile(v, 97.5)),
+                           "valid_repetitions": len(v)} if v else {"low": None, "high": None, "valid_repetitions": 0}
+                      for k, v in rates.items()}}

@@ -166,6 +166,63 @@ def _get_classifiers(seed: int) -> dict[str, Any]:
             eval_metric="logloss", verbosity=0, use_label_encoder=False,
         )
     return clfs
+
+
+def positive_probability(estimator, X):
+    """Locate clinical/membership class 1 explicitly, including reversed classes_."""
+    classes = np.asarray(estimator.classes_)
+    if classes.shape != (2,) or set(classes.tolist()) != {0, 1}:
+        raise ValueError("Expected classes 0 and 1")
+    proba = np.asarray(estimator.predict_proba(X))
+    if (proba.shape != (len(X), 2) or not np.isfinite(proba).all()
+            or (proba < 0).any() or (proba > 1).any()
+            or not np.allclose(proba.sum(axis=1), 1)):
+        raise ValueError("Invalid class probabilities")
+    return proba[:, int(np.flatnonzero(classes == 1)[0])]
+
+
+def binary_results(y, probability, *, predictions=None, prefix="utility"):
+    """Explicit undefined states; no replacement of missing metrics by zero.
+
+    F1 retains zero_division=0, with a reason when its denominator is zero.
+    PPV has no defined value in that case. Scores, not labels, define AUROC/AP.
+    """
+    from sklearn.metrics import average_precision_score, f1_score, roc_auc_score
+    y, probability = np.asarray(y), np.asarray(probability)
+    if y.ndim != 1 or probability.shape != y.shape or not len(y):
+        raise ValueError("Empty/misaligned binary outcomes")
+    if not set(np.unique(y)).issubset({0, 1}) or not np.isfinite(probability).all():
+        raise ValueError("Invalid binary outcomes")
+    pred = (probability >= .5).astype(int) if predictions is None else np.asarray(predictions)
+    if pred.shape != y.shape or not set(np.unique(pred)).issubset({0, 1}):
+        raise ValueError("Invalid binary predictions")
+    tp = int(((pred == 1) & (y == 1)).sum())
+    fp = int(((pred == 1) & (y == 0)).sum())
+    tn = int(((pred == 0) & (y == 0)).sum())
+    fn = int(((pred == 0) & (y == 1)).sum())
+    counts = dict(tp=tp, fp=fp, tn=tn, fn=fn, n_rows=len(y))
+    rows = []
+    def add(name, value, reason=None, *, retained_zero=False):
+        rows.append(dict(metric=f"{prefix}_{name}", value=value, unit="ratio",
+                         status="ok" if reason is None else ("defined_by_policy" if retained_zero else "not_computable"),
+                         reason=reason, **counts))
+    two = len(np.unique(y)) == 2
+    add("auroc", float(roc_auc_score(y, probability)) if two else None,
+        None if two else "only_one_true_class")
+    positive = tp + fn
+    add("average_precision", float(average_precision_score(y, probability)) if positive else None,
+        None if positive else "no_true_positive_class")
+    f1_undefined = 2 * tp + fp + fn == 0
+    add("f1", float(f1_score(y, pred, zero_division=0)),
+        "zero_denominator; zero_division=0" if f1_undefined else None, retained_zero=True)
+    for name, numerator, denominator in (("sensitivity", tp, tp + fn),
+                                         ("specificity", tn, tn + fp), ("ppv", tp, tp + fp)):
+        add(name, numerator / denominator if denominator else None,
+            None if denominator else "zero_denominator")
+    for name, value in counts.items():
+        if name != "n_rows":
+            rows.append(dict(metric=f"{prefix}_{name}", value=value, unit="rows", status="ok", reason=None, **counts))
+    return rows
  
  
 def _evaluate_classifier(clf, X_train: np.ndarray, y_train: np.ndarray, 
